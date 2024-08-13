@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Details</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
+    <style>
+        .status-label {
+            padding: 5px 10px;
+            border-radius: 5px;
+            color: #fff;
+            font-weight: bold;
+            text-align: center;
+            text-transform: uppercase;
+        }
+        .status-upcoming {
+            background-color: #ffc107;
+            color: azure;
+        }
+        .status-open {
+            background-color: #28a745; 
+        }
+        .status-closed {
+            background-color: #dc3545; 
+        }
+    </style>
+</head>
+<body>
+
+<div class="container ">
+    {% include 'components/navbar.html' %}    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }} text-center" role="alert">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+    <div class="card mt-4">
+        <div class="card-body px-5">
+            <div class="row">
+                <h2 class="card-title"> {{ task.task_name }}</h2>
+                <div class="col-4 mt-2">
+                    <div class="status-label {% if status == 'Upcoming' %}
+                                        status-upcoming{% elif status == 'Open' and task.status == 'In Progress' %}
+                                        status-open{% elif status == 'Closed' or task.status == 'COMPLETED' %}
+                                        status-closed{% endif %} px-2">
+                        {{ status }}
+                    </div>
+                </div>
+            </div>
+            
+            {% if project %}
+            <p><strong>Attached Project:</strong> {{ project.project_name }}</p>            
+        {% endif %}
+            <p><strong>Task statut: </strong>{{task.status }}</p>
+            <div class="row">
+                <p class="col"><strong>Start Date:</strong> {{ task.start_date }}</p>
+                <p class="col"><strong>Close Date:</strong> {{ task.close_date }}</p>
+            </div>
+            {%if task.description%}
+            <div class="mt-3">
+                <h5 class="font-weight-bold">Description:</h5>
+                <p class="border p-3 bg-light rounded">{{ task.description }}</p>
+            </div>
+            {%endif%}
+            
+            <p><strong>Assigned Admin:</strong> {{ task.admin.fulname }}</p>
+            <h3 class="card-title">Task Progressions</h3>
+            <ul class="list-group">
+                {% for progression in task_progressions %}
+                    <li class="list-group-item">
+                        <p><strong>Progress Name:</strong> {{ progression.progname }}</p>
+                        <p><strong>Made By:</strong> {{ progression.employee.fulname }}</p>
+                        <p><strong>Start Date:</strong> {{ progression.start_at }}</p>
+                        <p><strong>Completed at:</strong>
+                            {% if progression.end_at is not none %}
+                                {{ progression.end_at }}
+                            {% else %}
+                                &nbsp;
+                            {% endif %}
+                        </p>
+                        
+                        
+                        <div class="row">
+                            <p class="col-5 mt-2"><strong>Status:</strong> {{ progression.statut }}</p>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+            <div class="row mt-2">
+                
+                    <form action="{{ url_for('admin_routes.delete_task', task_id=task.task_id) }}"class="col-sm-2 mt-1  " method="POST" onsubmit="return confirm('Are you sure you want to delete this task?');">
+                        <button type="submit" class="btn btn-danger btn-sm">Delete Task</button>
+                    </form>
+                
+                
+                    <form action="{{ url_for('admin_routes.update_task', token=task.token) }}" class="col-sm-2 mt-1  "method="GET">
+                        <button type="submit" class="btn btn-primary btn-sm">Update Task</button>
+                    </form>
+                    <form action="{{ url_for('admin_routes.update_task_statut') }}" method="POST">
+                        <input type="hidden" name="task_id" value="{{ task.task_id }}">     
+                    {% if task.status == 'COMPLETED' or task.status == 'Closed by Admin' %}
+                    <input type="hidden" name="opentask">
+                    <button type="submit" class="btn btn-sm btn-success">Open the task</button>
+                    {% endif %}
+                    {% if task.status == 'In Progress' and  status=='Upcoming' %}
+                        <input type="hidden" name="opentask">
+                        <button type="submit" class="btn btn-sm btn-success">Open The task</button>
+                    
+                    {% elif task.status == 'In Progress' %}
+                        <input type="hidden" name="closetask">
+                        <button type="submit" class="btn btn-sm btn-warning">Close the task</button>
+                    {% endif %}
+                    </form>
+                  
+                
+            </div>  
+        </div>
+        
+    </div>
+
+    
+    
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
+    <style>
+        .sortable {
+            cursor: pointer;
+        }
+        .sortable:after {
+            content: " \25b2"; 
+        }
+        .sortable.asc:after {
+            content: " \25b2"; 
+        }
+        .sortable.desc:after {
+            content: " \25bc"; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        {% include 'components/navbar.html' %}        <p class="text-center">Welcome, {{ fullname }}</p>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} text-center" role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <div class="d-flex justify-content-center">
+            <div>
+                <h2 class="text-center mb-4">All Users</h2>
+                <table id="user-table" class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th class="sortable" data-column="userid">User ID</th>
+                            <th class="sortable" data-column="fullname">Full Name</th>
+                            <th class="sortable" data-column="email">Email</th>
+                            <th class="sortable" data-column="status">Status</th>
+                            <th class="sortable" data-column="usertype">User Type</th>
+                            <th>Change Status</th>
+                            <th>Change User Type</th>
+                        </tr>
+                        <tr id="filter-row">
+                            <th><input  type="search" class="form-control" placeholder="Filter by ID"></th>
+                            <th><input  type="search" class="form-control" placeholder="Filter by Name"></th>
+                            <th><input  type="search" class="form-control" placeholder="Filter by Email"></th>
+                            <th>
+                                <select class="form-control">
+                                    <option value="">All Status</option>
+                                    <option value="active">active</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                            </th>
+                            <th>
+                                <select class="form-control">
+                                    <option value="">All Types</option>
+                                    <option value="admin">Admin</option>
+                                    <option value="employee">Employee</option>
+                                    <option value="not defined">Not Defined</option>
+                                </select>
+                            </th>
+                            <th></th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in all_users %}
+                        <tr>
+                            <td class="text-center">{{ user.userid }}</td>
+                            <td class="text-center"><a href="{{ url_for('admin_routes.userdetails', Utoken=user.Utoken) }}" class="list-group-item-action">{{ user.fulname }}</a></td>
+                            <td class="text-center">{{ user.email }}</td>
+                            <td class="text-center">{{ user.status }}</td>
+                            <td class="text-center">{{ user.usertype }}</td>
+                            <td>
+                                <form class="row px-2" method="POST" action="{{ url_for('admin_routes.update_status', userid=user.userid) }}">
+                                    <button type="submit" name="action" value="activate" class="col btn btn-success">Activate</button>
+                                    <button type="submit" name="action" value="deactivate" class="col btn btn-danger">Deactivate</button>
+                                </form>
+                            </td>
+                            <td>
+                                <form class="row px-2" method="POST" action="{{ url_for('admin_routes.update_status', userid=user.userid) }}">
+                                    <button type="submit" name="usertype" value="Admin" class="col btn btn-success">Admin</button>
+                                    <button type="submit" name="usertype" value="employee" class="col btn btn-danger">Employee</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+    const table = document.getElementById('user-table');
+    const rows = Array.from(table.querySelectorAll('tbody tr'));
+    const filterRow = document.getElementById('filter-row');
+    let sortedColumn = null;
+    let sortOrder = 'asc';
+
+    function applyFilters() {
+        const filterInputs = filterRow.querySelectorAll('input, select');
+
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            const matches = Array.from(filterInputs).every((input, index) => {
+                const cellValue = cells[index] ? cells[index].textContent.trim().toLowerCase() : '';
+                const filterValue = input.value ? input.value.toLowerCase() : '';
+                
+                if (input.tagName === 'SELECT') {
+                    
+                    return !filterValue || cellValue === filterValue;
+                } else {
+                    
+                    return cellValue.includes(filterValue);
+                }
+            });
+            row.style.display = matches ? '' : 'none';
+        });
+    }
+
+    filterRow.querySelectorAll('input, select').forEach(input => {
+        input.addEventListener('input', applyFilters);
+    });
+
+    table.querySelectorAll('th.sortable').forEach(header => {
+        header.addEventListener('click', function() {
+            const column = this.getAttribute('data-column');
+            const columnIndex = Array.from(header.parentNode.children).indexOf(header);
+            
+            if (sortedColumn === column) {
+                sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortedColumn = column;
+                sortOrder = 'asc';
+            }
+
+            rows.sort((a, b) => {
+                const aText = a.children[columnIndex].textContent.trim().toLowerCase();
+                const bText = b.children[columnIndex].textContent.trim().toLowerCase();
+                if (aText < bText) return sortOrder === 'asc' ? -1 : 1;
+                if (aText > bText) return sortOrder === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            rows.forEach(row => table.querySelector('tbody').appendChild(row));
+
+            table.querySelectorAll('th.sortable').forEach(th => th.classList.remove('asc', 'desc'));
+            header.classList.add(sortOrder);
+        });
+    });
+
+    applyFilters();  
+});
+
+       
+    </script>
+</body>
+</html>

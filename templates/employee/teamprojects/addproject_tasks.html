@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create New Task for Project</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
+    <style>
+        .employee-list label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: normal;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        {% include 'components/enavbar.html' %}
+        <h2 class="mb-4">Create New Task for Project</h2>
+        <form action="{{ url_for('employee_routes.create_project_task', project_token=selected_project_token) }}" method="POST">
+            <div class="form-group">
+                <label for="task_name">Task Name:</label>
+                <input type="text" class="form-control" id="task_name" name="task_name" required>
+            </div>
+
+            <div class="form-group">
+                <label for="start_date">Start Date:</label>
+                <input type="date" class="form-control" id="start_date" name="start_date" required>
+            </div>
+
+            <div class="form-group">
+                <label for="close_date">Close Date:</label>
+                <input type="date" class="form-control" id="close_date" name="close_date">
+            </div>
+
+            <div class="form-group">
+                <label for="description">Description:</label>
+                <textarea class="form-control" id="description" name="description"></textarea>
+            </div>
+
+            <div id="employees-container">
+                <div class="form-group">
+                    <label for="employees">Assign to Employees:</label>
+                    <div id="employee-list">
+                        {% for emp in employees %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="employees[]" id="employee{{ emp.userid }}" value="{{ emp.userid }}">
+                                <label class="form-check-label" for="employee{{ emp.userid }}">
+                                    {{ emp.fulname }} (ID: {{ emp.userid }})
+                                </label>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Add Task</button>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }} text-center" role="alert">
+                {{ message }}
+            </div>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
+            
+            <input type="hidden" name="project_token" value="{{ selected_project_token }}">
+        </form>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>

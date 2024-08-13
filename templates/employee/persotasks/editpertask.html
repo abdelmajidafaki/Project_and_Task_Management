@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Personal Task</title>
+    <!-- Include Bootstrap CSS (adjust the path if needed) -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body>
+    <div class="container ">
+        {% include 'components/enavbar.html' %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} text-center" role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        <h2>Edit Personal Task</h2>
+        <form method="POST">
+            <div class="form-group">
+                <label for="taskName">Task Name</label>
+                <input type="text" class="form-control" id="taskName" name="taskName" value="{{ task.TaskName }}" required>
+            </div>
+            <div class="form-group">
+                <label for="doAt">Do At</label>
+                <input type="date" class="form-control" id="doAt" name="doAt" value="{{ task.DoAt }}">
+            </div>
+            <label for="description">Description:</label>
+            <textarea class="form-control" id="description" name="description"></textarea>
+            <button type="submit" class="btn btn-primary mt-1">Update Task</button>
+        </form>
+    </div>
+    
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendar</title>
+    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.10.2/main.min.css' rel='stylesheet' />
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
+    <style>
+.calendar-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%; 
+}
+
+.legend {
+    padding: 0;
+    overflow: hidden; /* Ensures legend doesn’t overflow */
+}
+
+.calendar {
+    flex: 1;
+    overflow: hidden; /* Hides any overflow content */
+}
+
+/* Media queries for responsive design */
+@media (min-width: 700px) {
+    .calendar-container {
+        flex-direction: row;
+    }
+
+    .legend {
+        flex: 1;
+        padding-right: 20px;
+    }
+
+    .calendar {
+        flex: 3;
+    }
+}
+
+/* FullCalendar styles */
+.fc-col-header-cell, .fc-daygrid-day-frame {
+    padding: 0 !important;
+}
+
+.fc-event-title, .fc-event-time {
+    font-size: 12px;
+}
+
+.fc-daygrid-event {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.event-color-circle {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 5px;
+}
+    </style>
+    
+    
+</head>
+<body>
+    <div class="container">
+        {% if user.usertype == 'employee' %}
+            {% include 'components/enavbar.html' %}
+        {% else %}
+            {% include 'components/navbar.html' %}
+        {% endif %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} text-center" role="alert">
+              {{ message }}
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+        <div class="calendar-container">
+            <div class="legend">
+                <div class="legend-container">
+                    <h4>Legend</h4>
+                    <div class="legend-item">
+                        <div class="event-color-circle" style="background-color: #33ff00;"></div>
+                        <span>Task</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="event-color-circle" style="background-color: #0066ff;"></div>
+                        <span>Project</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="event-color-circle" style="background-color: #ff0000;"></div>
+                        <span>Event</span>
+                    </div>
+                </div>
+                {% if user.usertype == 'Admin' %}
+                    <a href="{{url_for('admin_routes.add_event')}}" class="btn btn-sm btn-primary ">add event</a>
+                {%endif %}
+            </div>
+            <div id='calendar' class="calendar"></div>
+        </div>
+    </div>
+    <div class="modal fade" id="eventModal" tabindex="-1" role="dialog" aria-labelledby="eventModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="eventModalLabel">Event Details</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body" id="eventModalBody">
+                </div>
+                <div class="modal-footer">
+                    {% if user.usertype == 'Admin' %}
+                   
+                    <button type="button" id="updateEventBtn" class="btn btn-primary">Update Event</button>
+                    <button type="button" id="deleteEventBtn" class="btn btn-danger">Delete Event</button>
+                    {%endif %}
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.10.2/main.min.js'></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var calendarEl = document.getElementById('calendar');
+            var userType = '{{ user.usertype }}';
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                height: 'auto', // Adjust height automatically
+                events: {{ calendar_events|tojson }},
+                eventClick: function(info) {
+                    var eventId = info.event.id;
+                    var parts = eventId.split('-');
+                    var eventType = parts[0];
+                    var token = parts.slice(1).join('-');
+                    console.log('Token:', token);
+                    // Handle different event types
+                    if (eventType === 'project') {
+                        if (userType === 'Admin') {
+                            window.location.href = `/admin/projects/project_details/${token}`;
+                        } else if (userType === 'employee') {
+                            window.location.href = `/employee/team_projects/project_details/${token}`;
+                        }
+                    } else if (eventType === 'task') {
+                        if (userType === 'Admin') {
+                            window.location.href = `/admin/tasks/taskdetail/${token}`;
+                        } else if (userType === 'employee') {
+                            var etoken = '{{ user.Utoken }}';
+                            window.location.href = `/employee/Assignedtasks/taskdetails/${token}/${etoken}`;
+                        }
+                    } else if (eventType === 'event') {
+                        var modalBody = document.getElementById('eventModalBody');
+                        modalBody.innerHTML = `
+                            <p><strong>Title:</strong> ${info.event.title}</p>
+                            <p><strong>Start:</strong> ${info.event.start.toLocaleString()}</p>
+                            <p><strong>Room:</strong> ${info.event.extendedProps.salle}</p>
+                                <p><strong>Teams:</strong> ${info.event.extendedProps.teams}</p>
+                            <p><strong>Employees:</strong> ${info.event.extendedProps.employees || 'No employees assigned'}</p>
+                        `;
+                        $('#eventModal').modal('show');
+                        
+                        // Update buttons with event ID
+                        document.getElementById('updateEventBtn').onclick = function() {
+    window.location.href = `/admin/events/update/${token}`;
+};
+
+document.getElementById('deleteEventBtn').onclick = function() {
+    if (confirm('Are you sure you want to delete this event?')) {
+        fetch(`/admin/events/delete/${token}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ _method: 'DELETE' })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok.');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success') {
+                alert(data.message);
+                calendar.refetchEvents();
+                $('#eventModal').modal('hide');
+            } else {
+                alert('Error deleting event.');
+            }
+        })
+        .catch(error => {
+            console.error('There was a problem with the fetch operation:', error);
+        });
+    }
+};
+
+                    }
+                },
+                windowResize: function(view) {
+                    calendar.updateSize();
+                }
+            });
+            calendar.render();
+        });
+        </script>
+        
+</body>
+</html>

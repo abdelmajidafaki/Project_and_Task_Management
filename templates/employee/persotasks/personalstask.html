@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Tasks</title>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .sortable {
+            cursor: pointer;
+            position: relative;
+        }
+        .sortable:after {
+            content: " \25b2"; /* Default arrow for ascending */
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .sortable.asc:after {
+            content: " \25b2"; /* Ascending arrow */
+        }
+        .sortable.desc:after {
+            content: " \25bc"; /* Descending arrow */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        {% include 'components/enavbar.html' %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} text-center" role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        <h1 class="mb-4">Personal Tasks</h1>
+        
+        <a href="{{ url_for('employee_routes.addpertask') }}" class="btn btn-primary mb-3">Add Personal Task</a>
+        <table id="personal-tasks-table" class="table table-striped">
+            <thead>
+                <tr>
+                    <th class="sortable" data-column="taskName">Task Name</th>
+                    <th class="sortable" data-column="doAt">Do At</th>
+                    <th class="sortable" data-column="completedAt">Completed At</th>
+                    <th class="sortable" data-column="state">State</th>
+                    <th>Actions</th>
+                </tr>
+                <tr id="filter-row">
+                    <th><input type="text" class="form-control filter-input" placeholder="Filter by Task Name"></th>
+                    <th><input type="text" class="form-control filter-input" placeholder="Filter by Do At"></th>
+                    <th><input type="text" class="form-control filter-input" placeholder="Filter by Completed At"></th>
+                    <th>
+                        <select class="form-control filter-select">
+                            <option value="">All States</option>
+                            <option value="in progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in tasks %}
+                <tr>
+                    <td><a href="{{ url_for('employee_routes.personaltaskdetail', Ptoken=task.token) }}" class="list-group-item-action">{{ task.TaskName }}</a></td>
+                    <td>{{ task.DoAt }}</td>
+                    <td>{{ task.CompletedAt }}</td>
+                    <td>{{ task.State }}</td>
+                    <td class="row">
+                        <a href="{{ url_for('employee_routes.edit_pertask', token=task.token) }}" class="btn btn-sm btn-primary">Edit</a>
+                        <a href="{{ url_for('employee_routes.delete_pertask', token=task.token) }}" class="btn btn-sm btn-danger ml-2">Delete</a>
+                        {% if task.State == "in progress" %}
+                            <a href="{{ url_for('employee_routes.toggle_pertask', token=task.token, action='complete') }}" class="btn btn-sm btn-success ml-2">Task Is Completed</a>
+                        {% elif task.State == "completed" %}
+                            <a href="{{ url_for('employee_routes.toggle_pertask', token=task.token, action='rollback') }}" class="btn btn-sm btn-warning ml-2">Task Is not Completed</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const table = document.getElementById('personal-tasks-table');
+            const rows = Array.from(table.querySelectorAll('tbody tr'));
+            const filterRow = document.getElementById('filter-row');
+            let sortedColumn = null;
+            let sortOrder = 'asc';
+
+            function applyFilters() {
+                const filterInputs = filterRow.querySelectorAll('.filter-input');
+                const filterSelect = filterRow.querySelector('.filter-select');
+
+                rows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    const matches = Array.from(filterInputs).every((input, index) => {
+                        const cellValue = cells[index] ? cells[index].textContent.trim().toLowerCase() : '';
+                        const filterValue = input.value ? input.value.toLowerCase() : '';
+                        return cellValue.includes(filterValue);
+                    }) && (filterSelect.value === '' || cells[3].textContent.trim().toLowerCase() === filterSelect.value.toLowerCase());
+
+                    row.style.display = matches ? '' : 'none';
+                });
+            }
+
+            filterRow.querySelectorAll('.filter-input').forEach(input => {
+                input.addEventListener('input', applyFilters);
+            });
+
+            filterRow.querySelector('.filter-select').addEventListener('change', applyFilters);
+
+            table.querySelectorAll('th.sortable').forEach(header => {
+                header.addEventListener('click', function() {
+                    const column = this.getAttribute('data-column');
+                    const columnIndex = Array.from(header.parentNode.children).indexOf(header);
+                    
+                    if (sortedColumn === column) {
+                        sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        sortedColumn = column;
+                        sortOrder = 'asc';
+                    }
+
+                    rows.sort((a, b) => {
+                        const aText = a.children[columnIndex].textContent.trim().toLowerCase();
+                        const bText = b.children[columnIndex].textContent.trim().toLowerCase();
+                        if (aText < bText) return sortOrder === 'asc' ? -1 : 1;
+                        if (aText > bText) return sortOrder === 'asc' ? 1 : -1;
+                        return 0;
+                    });
+
+                    rows.forEach(row => table.querySelector('tbody').appendChild(row));
+
+                    table.querySelectorAll('th.sortable').forEach(th => th.classList.remove('asc', 'desc'));
+                    header.classList.add(sortOrder);
+                });
+            });
+
+            applyFilters();
+        });
+    </script>
+</body>
+</html>

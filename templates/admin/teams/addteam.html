@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add New Team</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
+    <style>
+        .scrollable-checkbox-list {
+            height: 110px;
+            overflow-y: auto; 
+            border: 1px solid #ddd;
+            padding: 10px; 
+        }
+        .scrollable-checkbox-list label {
+            display: block;
+        }
+        .search-box {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container ">
+        {% include 'components/navbar.html' %}        <h2>Create New Team</h2>
+        <form method="POST" action="{{ url_for('admin_routes.add_team') }}">
+            <div class="form-group">
+                <label for="team_name">Team Name:</label>
+                <input type="text" class="form-control" id="team_name" name="team_name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="team_members">Team Members:</label>
+                <input type="text" id="search-box-members" class="form-control search-box" placeholder="Search for members...">
+                <div class="scrollable-checkbox-list" id="checkbox-list">
+                    {% for user in employees %}
+                        <label>
+                            <input type="checkbox" name="team_members" value="{{ user.userid }}">
+                            {{ user.fulname }}
+                        </label>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="supervisor_id">Supervisor:</label>
+                <input type="text" id="search-box-supervisor" class="form-control search-box" placeholder="Search for supervisors...">
+                <select class="form-control" id="supervisor_id" name="supervisor_id" required>
+                    <option value="" disabled selected>Select a supervisor</option> 
+                    {% for user in employees %}
+                        <option value="{{ user.userid }}">{{ user.fulname }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Add Team</button>
+        </form>
+
+        <br>
+        <a href="{{ url_for('admin_routes.teams') }}">Back to Teams</a>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} text-center" role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div> 
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        document.getElementById('search-box-members').addEventListener('keyup', function() {
+            var filter = this.value.toLowerCase();
+            var checkboxes = document.querySelectorAll('#checkbox-list label');
+            checkboxes.forEach(function(label) {
+                var text = label.textContent.toLowerCase();
+                if (text.includes(filter)) {
+                    label.style.display = '';
+                } else {
+                    label.style.display = 'none';
+                }
+            });
+        });
+
+        document.getElementById('search-box-supervisor').addEventListener('keyup', function() {
+            var filter = this.value.toLowerCase();
+            var options = document.querySelectorAll('#supervisor_id option');
+            options.forEach(function(option) {
+                var text = option.textContent.toLowerCase();
+                if (text.includes(filter)) {
+                    option.style.display = '';
+                } else {
+                    option.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
