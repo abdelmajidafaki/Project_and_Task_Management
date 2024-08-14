@@ -79,8 +79,8 @@
             </div>
         </div>
         <div class="row">
-            {% for project, status, teams ,is_supervisor in projects %}
-            <div class="col-12 col-sm-12 col-md-6 col-lg-6 col-xl-4 mt-2 mb-3">
+            {% for project, status, teams, is_supervisor in projects %}
+            <div class="col-12 col-sm-12 col-md-6 col-lg-6 col-xl-4 mt-2 mb-3 project-card-container">
                 <a href="{{ url_for('employee_routes.project_details', token=project.token) }}" class="card-link">
                     <div class="card card-container project_card" data-status="{{ status }}">
                         <div class="card-body">
@@ -121,7 +121,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             const searchBox = document.getElementById('searchBox');
             const statusFilter = document.getElementById('statusFilter');
-            const projectCards = document.querySelectorAll('.project_card');
+            const projectCards = document.querySelectorAll('.project-card-container');
 
             function filterProjects() {
                 const searchQuery = searchBox.value.toLowerCase();
@@ -129,18 +129,19 @@
 
                 projectCards.forEach(card => {
                     const projectName = card.querySelector('.card-title').textContent.toLowerCase();
-                    const projectStatus = card.getAttribute('data-status');
+                    const projectStatus = card.querySelector('.project_card').getAttribute('data-status');
 
                     const matchesSearch = projectName.includes(searchQuery);
                     const matchesStatus = selectedStatus === 'All' || projectStatus === selectedStatus;
 
                     if (matchesSearch && matchesStatus) {
-                        card.parentElement.classList.remove('hidden');
+                        card.classList.remove('hidden');
                     } else {
-                        card.parentElement.classList.add('hidden');
+                        card.classList.add('hidden');
                     }
                 });
             }
+
             searchBox.addEventListener('input', filterProjects);
             statusFilter.addEventListener('change', filterProjects);
             filterProjects();

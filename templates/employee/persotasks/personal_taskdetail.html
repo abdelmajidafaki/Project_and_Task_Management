@@ -107,19 +107,19 @@
                  Task Is Completed
               </button>
             </form>
-            <a href="{{ url_for('employee_routes.addpersonalprogression', Ptoken=task.token) }}"class="col-auto btn btn-primary ">Add Progression</a>
-            <a href="{{ url_for('employee_routes.edit_pertask', token=task.token) }}" class=" col-auto btn  ml-2 btn-primary">Edit</a>
+            <a href="{{ url_for('employee_routes.addpersonalprogression', Ptoken=task.token) }}"class="col-auto btn btn-sm btn-primary ">Add Progression</a>
+            <a href="{{ url_for('employee_routes.edit_pertask', token=task.token) }}" class=" col-auto btn btn-sm ml-2 btn-primary">Edit</a>
           </div>
           
           {%else%}
           <div class="row mt-2">
             <form class="col-auto" method="POST">
             <input type="hidden" name="Task_not_done" />
-            <button type="submit" class="btn btn-warning">
+            <button type="submit" class="btn btn-sm btn-warning">
               Task Is Not Completed 
             </button>
           </form>
-          <a href="{{ url_for('employee_routes.edit_pertask', token=task.token) }}" class=" col-auto btn btn-md btn-primary">Edit</a>
+          <a href="{{ url_for('employee_routes.edit_pertask', token=task.token) }}" class=" col-auto  btn-sm btn-primary">Edit Personal Task</a>
           </div>
           
           

@@ -82,22 +82,13 @@
             const userType = document.getElementById('user_type').value;
             const searchQuery = document.getElementById('search').value.toLowerCase();
             const employeesList = document.getElementById('employees-list');
-
-            // Filter employees based on the selected teams, user type, and search query
             const filteredEmployees = employeesData.filter(employee => {
-                // Check if the employee is NOT in any of the selected teams
                 const isNotInTeams = selectedTeamIds.every(teamId => !employee.teams.includes(teamId) && employee.userid !== getSupervisorIdForTeam(teamId));
-
-                // Check if the employee matches the selected user type
                 const matchesUserType = !userType || employee.usertype === userType;
-
-                // Check if the employee's name matches the search query
                 const matchesSearch = employee.fulname.toLowerCase().includes(searchQuery);
 
                 return isNotInTeams && matchesUserType && matchesSearch;
             });
-
-            // Update the employee checkboxes
             employeesList.innerHTML = '';
             filteredEmployees.forEach(employee => {
                 const checkbox = `
@@ -109,15 +100,10 @@
                 employeesList.innerHTML += checkbox;
             });
         }
-
-
-        // Helper function to get the supervisor ID for a given team
         function getSupervisorIdForTeam(teamId) {
             const team = teamsData.find(t => t.team_id === teamId);
             return team ? team.supervisor_id : null;
         }
-
-        // Initialize the employee list on page load
         updateEmployeeList();
 
     </script>

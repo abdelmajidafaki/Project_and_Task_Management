@@ -1,14 +1,17 @@
 from flask import Blueprint, render_template, request, flash, redirect, url_for,jsonify
 from flask_login import login_required, current_user
-from extensions import db
+from extensions import db,ALLOWED_EXTENSIONS,bcrypt
 from functools import wraps
 from modals import users, Task, TaskAssignment, Event,Task_Progression,EventEmployee, EventTeam,PersonalTask, PersonalTaskProgression,Teams,TeamsMember,Project,ProjectTeam
 import secrets
+from werkzeug.utils import secure_filename
+import base64
 from sqlalchemy.orm import joinedload
 from datetime import datetime, date
-from sqlalchemy import exists
 
 employee_routes = Blueprint('employee_routes', __name__)
+
+
 
 def employee_required(func):
     @wraps(func)
@@ -52,6 +55,8 @@ def get_project_status(project):
         return "Open"
     else:
         return "Closed"
+#-----------------------------------------------------tasks-----------------------------------------------------------------
+
 @employee_routes.route("/Assignedtasks", methods=['GET', 'POST'])
 @login_required
 @employee_required
@@ -171,8 +176,9 @@ def delete_pertask(token):
     db.session.delete(task)
     db.session.commit()
     return redirect(url_for('employee_routes.personaltasks'))
+#------------------------------------------------------pertasks-----------------------------------------------------------------
 
-@employee_routes.route('/addpersonaltask', methods=['GET', 'POST'])
+@employee_routes.route('/createpersonaltask', methods=['GET', 'POST'])
 @login_required
 @employee_required
 def addpertask():
@@ -183,7 +189,9 @@ def addpertask():
         state = request.form.get('state')
         description = request.form.get('description')           
         employee_id = current_user.userid
-     
+        if do_at <  date.today():
+            flash('Start date cannot be in the past.', 'danger')
+            return redirect(request.referrer)
         new_task = PersonalTask(
             TaskName=task_name,
             DoAt=do_at,
@@ -228,12 +236,14 @@ def edit_pertask(token):
         task.TaskName = request.form.get('taskName')
         task.Description = request.form.get('description') 
         task.DoAt = process_date(request.form.get('doAt'))
+        if task.DoAt <  date.today():
+            flash('Start date cannot be in the past.', 'danger')
+            return redirect(request.referrer)
         task.CompletedAt = request.form.get('completedAt')
         db.session.commit()
         return redirect(url_for('employee_routes.personaltasks'))
     
     return render_template('employee/persotasks/editpertask.html', task=task)
-
 @employee_routes.route('/personaltasks')
 @login_required
 @employee_required
@@ -309,6 +319,7 @@ def addpersonalprogression(Ptoken):
         return redirect(url_for('employee_routes.personaltaskdetail', Ptoken=Ptoken))
     
     return render_template('employee/persotasks/add_personal_progression.html', task=task)
+#------------------------------------------------------teams-----------------------------------------------------------------
 
 @employee_routes.route('/teams', methods=['GET'])
 @employee_required
@@ -334,7 +345,7 @@ def employee_teams():
     member_teams = [team for team in teams if team.supervisor and team.supervisor.userid != user_id]
 
     return render_template('employee/empteam/myteam.html', supervisor_teams=supervisor_teams, member_teams=member_teams, team_data=team_data)
-
+#------------------------------------projects---------------------------------------------------------------------------------
 @employee_routes.route('/team_projects', methods=['GET'])
 @employee_required
 @login_required
@@ -383,7 +394,7 @@ def project_details(token):
         })
     return render_template('employee/teamprojects/Tprojectsdetails.html', project=project, status=get_project_status(project), team_details=team_details, tasks=tasks_with_status, is_supervisor=is_supervisor)
 
-@employee_routes.route('/projects/create_new_task/<project_token>', methods=['GET', 'POST'])
+@employee_routes.route('/team_projects/create_new_task/<project_token>', methods=['GET', 'POST'])
 @employee_required
 @login_required
 def create_project_task(project_token):
@@ -394,14 +405,36 @@ def create_project_task(project_token):
 
     if request.method == 'POST':
         task_name = request.form['task_name']
-        start_date = request.form['start_date']
-        close_date = request.form.get('close_date')
+        start_date_str = request.form['start_date']
+        close_date_str = request.form.get('close_date')
         description = request.form.get('description')
         employee_ids = request.form.getlist('employees[]')
 
-        if not task_name or not start_date:
+        if not task_name or not start_date_str:
             flash('Task name and start date are required.', 'danger')
             return redirect(request.url)
+
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            flash('Invalid start date format.', 'danger')
+            return redirect(request.url)
+
+        if start_date < project.start_date:
+            flash(f'Task start date cannot be earlier than the project start date ({project.start_date}).', 'danger')
+            return redirect(request.url)
+
+        close_date = None
+        if close_date_str:
+            try:
+                close_date = datetime.strptime(close_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                flash('Invalid close date format.', 'danger')
+                return redirect(request.url)
+
+            if close_date < start_date:
+                flash('Close date cannot be earlier than the start date.', 'danger')
+                return redirect(request.url)
 
         new_task = Task(
             task_name=task_name,
@@ -423,7 +456,8 @@ def create_project_task(project_token):
 
     return render_template('employee/teamprojects/addproject_tasks.html', selected_project_token=project_token, employees=employees)
 
-@employee_routes.route('/projects/update_task/<task_token>', methods=['GET', 'POST'])
+
+@employee_routes.route('/team_projects/update_task/<task_token>', methods=['GET', 'POST'])
 @employee_required
 @login_required
 def update_project_task(task_token):
@@ -438,10 +472,39 @@ def update_project_task(task_token):
         return redirect(url_for('employee_routes.employee_projects'))
 
     if request.method == 'POST':
-        task.task_name = request.form['task_name']
-        task.start_date = request.form['start_date']
-        task.close_date = request.form.get('close_date')
+        task_name = request.form['task_name']
+        start_date_str = request.form['start_date']
+        close_date_str = request.form.get('close_date')
         selected_employee_ids = request.form.getlist('employees[]')
+
+        if not task_name or not start_date_str:
+            flash('Task name and start date are required.', 'danger')
+            return redirect(request.url)
+
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            flash('Invalid start date format.', 'danger')
+            return redirect(request.url)
+
+        if start_date < project.start_date:
+            flash(f'Task start date cannot be earlier than the project start date ({project.start_date}).', 'danger')
+            return redirect(request.url)
+
+        close_date = None
+        if close_date_str:
+            try:
+                close_date = datetime.strptime(close_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                flash('Invalid close date format.', 'danger')
+                return redirect(request.url)
+
+            if close_date < start_date:
+                flash('Close date cannot be earlier than the start date.', 'danger')
+                return redirect(request.url)
+        task.task_name = task_name
+        task.start_date = start_date
+        task.close_date = close_date
         TaskAssignment.query.filter_by(task_id=task.task_id).delete()
         for employee_id in selected_employee_ids:
             assignment = TaskAssignment(task_id=task.task_id, employee_id=employee_id)
@@ -450,12 +513,13 @@ def update_project_task(task_token):
         db.session.commit()
         flash('Task updated successfully!', 'success')
         return redirect(url_for('employee_routes.project_details', token=project.token))
+
     employees = users.query.join(TeamsMember).filter(TeamsMember.team_id.in_(team_ids)).all()
     selected_employee_ids = [assignment.employee_id for assignment in task.assignments]
 
     return render_template('employee/teamprojects/update_team_ptasks.html', task=task, employees=employees, selected_employee_ids=selected_employee_ids)
 
-@employee_routes.route("/projects/delete/<int:task_id>", methods=['GET','POST'])
+@employee_routes.route("/team_projects/delete/<int:task_id>", methods=['GET','POST'])
 @login_required
 @employee_required
 def delete_project_task(task_id):
@@ -470,7 +534,7 @@ def delete_project_task(task_id):
         flash('Task not found.', 'danger')
     return redirect(request.referrer)
 
-@employee_routes.route('/update_project_task_statut', methods=['POST'])
+@employee_routes.route('team_projects/update_project_task_statut', methods=['POST'])
 @login_required
 @employee_required
 def update_project_task_statut():
@@ -493,7 +557,7 @@ def update_project_task_statut():
     flash(f'Task is now {task.status.lower()}', 'success')
     
     return redirect(request.referrer)
-  
+#------------------------------------------------------------------calendar---------------------------------------------------------
 @employee_routes.route('/calendar')
 @login_required
 @employee_required
@@ -573,7 +637,160 @@ def calendar():
             'salle': event.salle,
             'teams': team_names if team_names else 'No Team Assigned',
             'employees': employee_names if employee_names else 'No Employees Assigned',
-            'color': '#ff0000'
+            'color': '#ff0000',
+            'creator_id': event.creator_id 
+
+
         })
 
     return render_template('components/calendar.html', calendar_events=calendar_events, user=user)
+
+@employee_routes.route('/team/<int:team_id>/add_event', methods=['GET', 'POST'])
+@login_required
+@employee_required
+def add_event(team_id):
+    user = current_user
+    team = Teams.query.filter_by(team_id=team_id, supervisor_id=user.userid).first()
+    if not team:
+        flash('You are not authorized to add events to this team.', 'danger')
+        return redirect(url_for('employee_routes.calendar'))
+    if request.method == 'POST':
+        title = request.form.get('title')
+        start_date = request.form.get('start_date')
+        salle = request.form.get('salle')
+        start_date = datetime.strptime(start_date, '%Y-%m-%dT%H:%M')
+        if start_date < datetime.combine(date.today(), datetime.min.time()):
+            flash('Start date cannot be in the past.', 'danger')
+            return render_template('employee/addevent.html', team=team)
+        new_event = Event(title=title, At=start_date, salle=salle, token=secrets.token_urlsafe(),creator_id=current_user.userid)
+        db.session.add(new_event)
+        db.session.commit()
+        event_team = EventTeam(event_id=new_event.id, team_id=team_id)
+        db.session.add(event_team)
+        db.session.commit()
+        flash('Event added successfully!', 'success')
+        return redirect(url_for('employee_routes.calendar'))
+
+    return render_template('employee/addevent.html', team=team)
+@employee_routes.route('/events/delete/<string:token>', methods=['POST'])
+@login_required
+@employee_required
+def delete_event(token):
+    try:
+        event = Event.query.filter_by(token=token).first_or_404()
+        EventTeam.query.filter_by(event_id=event.id).delete()
+        db.session.delete(event)
+        db.session.commit()
+        return flash({'Event updated successfully!': 'success'})
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error deleting event: {e}")
+        return jsonify({'status': 'error', 'message': 'An error occurred while deleting the event.'}), 500
+
+@employee_routes.route('/events/update/<string:token>', methods=['GET', 'POST'])
+@login_required
+@employee_required
+def update_event_employee(token):
+    event = Event.query.filter_by(token=token).first_or_404()
+
+    if event.creator_id != current_user.userid:
+        flash('You do not have permission to edit this event.', 'danger')
+        return redirect(url_for('calendar'))
+
+    if request.method == 'POST':
+        title = request.form.get('title')
+        At = request.form.get('At')
+        salle = request.form.get('salle')
+        At= datetime.strptime(At, '%Y-%m-%dT%H:%M')
+        if At < datetime.combine(date.today(), datetime.min.time()):
+                flash('Start date cannot be in the past.', 'danger')
+                return render_template('employee/updateevent.html', event=event)
+        if title and At and salle:
+            event.title = title
+            event.At = At
+            event.salle = salle
+            
+            db.session.commit()
+            flash('Event updated successfully.', 'success')
+            return redirect(url_for('employee_routes.calendar'))
+        else:
+            flash('Please fill out all fields.', 'danger')
+    
+    return render_template('employee/updateevent.html', event=event)
+#----------------------------------------------account-------------------------------------
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+@employee_routes.route('/profile/<string:Utoken>', methods=['GET', 'POST'])
+@login_required
+def profile(Utoken):
+    user = users.query.filter_by(Utoken=Utoken).first()
+    
+    if request.method == 'POST':
+        if 'profile_picture' in request.files:
+            file = request.files['profile_picture']
+            if file and allowed_file(file.filename):
+                image_binary = file.read()
+                print(len(image_binary)) 
+                user.profile_picture = image_binary
+                db.session.commit()
+                
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'status': 'success'}), 200
+                
+                return redirect(url_for('employee_routes.profile', Utoken=user.Utoken))
+    
+    return render_template('employee/account.html', user=user)
+
+
+@employee_routes.route('/change_full_name/<Utoken>', methods=['POST'])
+@login_required
+def change_full_name(Utoken):
+    user = users.query.filter_by(Utoken=Utoken).first()
+    
+    new_full_name = request.form.get('new_full_name')
+    current_password = request.form.get('current_password')
+    
+    if bcrypt.check_password_hash(user.Pasword, current_password):
+
+        user.fulname = new_full_name
+        db.session.commit()
+        flash('Full name updated successfully', 'success')
+    else:
+        flash('Current password is incorrect', 'danger')
+    
+    return redirect(url_for('employee_routes.profile', Utoken=Utoken))
+@employee_routes.route('/change_email/<Utoken>', methods=['POST'])
+@login_required
+def change_email(Utoken):
+    user = users.query.filter_by(Utoken=Utoken).first()
+    new_email = request.form.get('new_email')
+    password_confirmation = request.form.get('password_confirmation')
+    
+    if bcrypt.check_password_hash(user.Pasword, password_confirmation):
+        user.email = new_email
+        db.session.commit()
+        flash('Email updated successfully', 'success')
+    else:
+        flash('Password confirmation is incorrect', 'danger')
+    
+    return redirect(url_for('employee_routes.profile', Utoken=Utoken))
+@employee_routes.route('/change_password/<Utoken>', methods=['POST'])
+@login_required
+def change_password(Utoken):
+    user = users.query.filter_by(Utoken=Utoken).first()
+    current_password = request.form.get('current_password')
+    new_password = request.form.get('new_password')
+    confirm_new_password = request.form.get('confirm_new_password')
+    if bcrypt.check_password_hash(user.Pasword, current_password):
+        if new_password == confirm_new_password:
+            user.Pasword = bcrypt.generate_password_hash(new_password)
+            db.session.commit()
+            flash('Password updated successfully', 'success')
+        else:
+            flash('New passwords do not match', 'danger')
+    else:
+        flash('Current password is incorrect', 'danger')
+    
+    return redirect(url_for('employee_routes.profile', Utoken=Utoken))
+

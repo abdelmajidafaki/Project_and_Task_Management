@@ -5,10 +5,6 @@ from modals import users, Event,Task, TaskAssignment, Task_Progression,EventEmpl
 from datetime import datetime, date, timezone
 import secrets
 from functools import wraps
-import random
-from sqlalchemy.orm import joinedload
-
-
 
 admin_routes = Blueprint('admin_routes', __name__)
 
@@ -70,6 +66,7 @@ def get_project_status(project):
         return "Open"
     else:
         return "Closed"
+#---------------------------------------------------------------users-------------------------------------------------------------------
 
 @admin_routes.route("/usersdashboard", methods=['GET', 'POST'])
 @login_required
@@ -105,7 +102,7 @@ def update_status(userid):
     return redirect(url_for('admin_routes.usersdashboard'))
 
 
-@admin_routes.route("/userdetails/<Utoken>", methods=['GET', 'POST'])
+@admin_routes.route("/usersdashboard/userdetails/<Utoken>", methods=['GET', 'POST'])
 @login_required
 @admin_required
 def userdetails(Utoken):
@@ -151,7 +148,7 @@ def userdetails(Utoken):
     return render_template("admin/userdetails.html", user=user, personal_tasks=personal_tasks, tasks=tasks, teams=teams, supervised_teams=supervised_teams, projects=projects)
 
 
-@admin_routes.route('/userdetails/employepertask/<string:token>')
+@admin_routes.route('/usersdashboard/userdetails/employepertask/<string:token>')
 @login_required
 @admin_required
 def employepertask(token):
@@ -159,9 +156,7 @@ def employepertask(token):
     task_progressions = PersonalTaskProgression.query.filter_by(Ptask_id=task.PTDID).all()
     return render_template("admin/employeeperstask.html", task=task, task_progressions=task_progressions)
 
-
-
-
+#---------------------------------------------------------------teams-------------------------------------------------------------------
 @admin_routes.route('/teams', methods=['GET'])
 @login_required
 @admin_required
@@ -308,6 +303,7 @@ def remove_member_from_team(team_id, member_id):
 
     return redirect(request.referrer)
 
+#---------------------------------------------------------------tasks-------------------------------------------------------------------
 
 @admin_routes.route("/tasks/taskdetail/<token>", methods=['GET', 'POST'])
 @login_required
@@ -426,16 +422,19 @@ def addnewtask():
 
         if project_start_date and start_date < project_start_date:
             flash(f'Task start date cannot be earlier than the project start date ({project_start_date.strftime("%Y-%m-%d")}).', 'danger')
-            return render_template(
-                "admin/tasks/addtasks.html",
-                employees=[{'userid': e.userid, 'fulname': e.fulname} for e in users.query.filter_by(usertype='employee').all()],
-                projects=Project.query.all(),
-                selected_project_token=project_token
-            )
+            return redirect(request.referrer)
 
         close_date = request.form.get('close_date')
         if close_date:
             close_date = datetime.strptime(close_date, '%Y-%m-%d').date()
+            if close_date < start_date:
+                flash('Close date cannot be earlier than the start date.', 'danger')
+                return render_template(
+                    "admin/tasks/addtasks.html",
+                    employees=[{'userid': e.userid, 'fulname': e.fulname} for e in users.query.filter_by(usertype='employee').all()],
+                    projects=Project.query.all(),
+                    selected_project_token=project_token
+                )
         else:
             close_date = None
 
@@ -538,11 +537,14 @@ def update_task(token):
             project = Project.query.get(task.project_id)
             if project and start_date < project.start_date:
                 flash(f'Task start date cannot be earlier than the project start date ({project.start_date.strftime("%Y-%m-%d")}).', 'danger')
-                return render_template("admin/tasks/update_task.html", task=task, project_teams=project_teams, employees=employees_list, projects=projects, selected_employee_ids=selected_employee_ids)
+                return redirect(request.referrer)
 
         close_date = request.form.get('close_date')
         if close_date:
             close_date = datetime.strptime(close_date, '%Y-%m-%d').date()
+            if close_date < start_date:
+                flash('Close date cannot be earlier than the start date.', 'danger')
+                return redirect(request.referrer)
         else:
             close_date = None
 
@@ -562,8 +564,7 @@ def update_task(token):
 
     return render_template("admin/tasks/update_task.html", task=task, employees=employees_list, project_teams=project_teams, projects=projects, selected_employee_ids=selected_employee_ids)
 
-
-
+#---------------------------------------------------------------projects-------------------------------------------------------------------
 
 @admin_routes.route('/projects', methods=['GET', 'POST'])
 @login_required
@@ -609,9 +610,9 @@ def create_project():
     if request.method == 'POST':
         project_name = request.form['project_name']
         start_date_str = request.form.get('start_date')
-        end_date = request.form.get('end_date')
+        end_date_str = request.form.get('end_date')
         description = request.form.get('description')
-        selected_teams = request.form.getlist('teams')  
+        selected_teams = request.form.getlist('teams')
         created_by = current_user.userid
 
         try:
@@ -619,9 +620,19 @@ def create_project():
         except ValueError:
             flash('Invalid start date format.', 'danger')
             return render_template('admin/projects/addproject.html', teams=Teams.query.all())
-        
+
+        try:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            flash('Invalid end date format.', 'danger')
+            return render_template('admin/projects/addproject.html', teams=Teams.query.all())
+
         if start_date < date.today():
             flash('Start date cannot be in the past.', 'danger')
+            return render_template('admin/projects/addproject.html', teams=Teams.query.all())
+
+        if end_date < start_date:
+            flash('End date cannot be earlier than the start date.', 'danger')
             return render_template('admin/projects/addproject.html', teams=Teams.query.all())
 
         new_project = Project(
@@ -631,19 +642,19 @@ def create_project():
             description=description,
             created_by=created_by
         )
-        
+
         db.session.add(new_project)
         db.session.flush()
 
         for team_id in selected_teams:
             project_team = ProjectTeam(project_id=new_project.project_id, team_id=team_id)
             db.session.add(project_team)
-        
+
         db.session.commit()
-        
+
         flash('Project created successfully!', 'success')
         return redirect(url_for('admin_routes.projects'))
-    
+
     teams = Teams.query.all()
     return render_template('admin/projects/addproject.html', teams=teams)
 
@@ -658,7 +669,7 @@ def update_project(token):
     if request.method == 'POST':
         project_name = request.form['project_name']
         start_date_str = request.form['start_date']
-        end_date = request.form['end_date']
+        end_date_str = request.form['end_date']
         description = request.form['description']
         selected_team_ids = request.form.getlist('teams')
         
@@ -666,12 +677,21 @@ def update_project(token):
             start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
         except ValueError:
             flash('Invalid start date format.', 'danger')
-            return render_template('admin/projects/update_project.html', project=project, all_teams=all_teams)
-        
+            return render_template('admin/projects/addproject.html', teams=Teams.query.all())
+
+        try:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            flash('Invalid end date format.', 'danger')
+            return render_template('admin/projects/addproject.html', teams=Teams.query.all())
+
         if start_date < date.today():
             flash('Start date cannot be in the past.', 'danger')
-            return render_template('admin/projects/update_project.html', project=project, all_teams=all_teams)
+            return render_template('admin/projects/addproject.html', teams=Teams.query.all())
 
+        if end_date < start_date:
+            flash('End date cannot be earlier than the start date.', 'danger')
+            return render_template('admin/projects/addproject.html', teams=Teams.query.all())
         project.project_name = project_name
         project.start_date = start_date
         project.end_date = end_date
@@ -693,12 +713,15 @@ def update_project(token):
 @login_required
 @admin_required
 def delete_project(project_id):
+    project_teams = ProjectTeam.query.filter_by(project_id=project_id).all()
+    for project_team in project_teams:
+        db.session.delete(project_team)
+
     project = Project.query.get_or_404(project_id)
     db.session.delete(project)
     db.session.commit()
     flash('Project deleted successfully!', 'success')
     return redirect(request.referrer)
-
 
 
 @admin_routes.route("/projects/project_details/<string:token>", methods=['GET', 'POST'])
@@ -769,19 +792,7 @@ def update_project_statut():
             flash('Project not found.', 'danger')
         return redirect(request.referrer)
     
-
-
-
-
-
-
-
-
-
-
-
-
-
+#---------------------------------------------------------------calendar-------------------------------------------------------------------
 
 @admin_routes.route('/calendar')
 @login_required
@@ -830,11 +841,7 @@ def calendar():
 
     return render_template('components/calendar.html', calendar_events=calendar_events, user=user)
 
-
-
-
-
-@admin_routes.route('/events/update/<string:token>', methods=['GET', 'POST'])
+@admin_routes.route('/calendar/events/update/<string:token>', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def update_event(token):
@@ -844,7 +851,9 @@ def update_event(token):
         event.title = request.form.get('title')
         event.At = datetime.strptime(request.form.get('start'), '%Y-%m-%dT%H:%M')
         event.salle = request.form.get('salle')
-
+        if event.At < date.today():
+            flash('Start date cannot be in the past.', 'danger')
+            return redirect(request.referrer)
         EventTeam.query.filter_by(event_id=event.id).delete()
         team_ids = request.form.getlist('teams[]')
         for team_id in team_ids:
@@ -877,7 +886,9 @@ def update_event(token):
 
     return render_template('admin/update_event.html', event=event, teams_data=teams_data, employees_data=employees_data, event_teams=event_teams, event_employees=event_employees)
 
-@admin_routes.route('/events/delete/<string:token>', methods=['POST'])
+@admin_routes.route('/calendar/events/delete/<string:token>', methods=['POST'])
+@login_required
+@admin_required
 def delete_event(token):
     try:
         event = Event.query.filter_by(token=token).first_or_404()
@@ -892,11 +903,9 @@ def delete_event(token):
         return jsonify({'status': 'error', 'message': 'An error occurred while deleting the event.'}), 500
 
 
-
-
-
-
-@admin_routes.route('/calendar/add_event', methods=['GET', 'POST'])
+@admin_routes.route('/calendar/calendar/add_event', methods=['GET', 'POST'])
+@login_required
+@admin_required
 def add_event():
     if request.method == 'POST':
         title = request.form['title']
@@ -907,7 +916,10 @@ def add_event():
 
         try:
             start_date = datetime.strptime(start_date, '%Y-%m-%dT%H:%M')
-            new_event = Event(title=title, At=start_date, token=secrets.token_urlsafe(), salle=salle)
+            if start_date < datetime.combine(date.today(), datetime.min.time()):
+                flash('Start date cannot be in the past.', 'danger')
+                return render_template('admin/addevent.html', teams_data=teams_data, employees_data=employees_data)
+            new_event = Event(title=title, At=start_date, token=secrets.token_urlsafe(), salle=salle,creator_id=current_user.userid)
             db.session.add(new_event)
             db.session.commit()
             for team_id in team_ids:

@@ -1,7 +1,7 @@
 from extensions import db
 import secrets
-from datetime import datetime
 from flask_login import UserMixin
+from sqlalchemy import LargeBinary
 
 class users(db.Model, UserMixin):
     __tablename__ = 'users'
@@ -12,7 +12,7 @@ class users(db.Model, UserMixin):
     status = db.Column(db.String(20), default='inprogress')
     usertype = db.Column(db.String(20), default='not defined')
     Utoken = db.Column(db.String(64), unique=True, nullable=False, default=lambda: secrets.token_urlsafe())
-
+    profile_picture = db.Column(LargeBinary, nullable=True)
     assigned_tasks = db.relationship('TaskAssignment', back_populates='employee')
     tasks_assigned = db.relationship('Task', back_populates='admin')
     task_progressions = db.relationship('Task_Progression', back_populates='employee')
@@ -134,9 +134,11 @@ class Event(db.Model):
     At = db.Column(db.DateTime, nullable=False)
     salle = db.Column(db.String(100), nullable=False)
     token = db.Column(db.String(36), unique=True, nullable=False)
+    creator_id = db.Column(db.Integer, db.ForeignKey('users.userid'), nullable=False)
 
     event_teams = db.relationship('EventTeam', back_populates='event')
     event_employees = db.relationship('EventEmployee', back_populates='event')
+    creator = db.relationship('users', backref='events_created')
 
 class EventEmployee(db.Model):
     __tablename__ = 'event_employees'

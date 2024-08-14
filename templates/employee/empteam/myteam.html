@@ -65,6 +65,10 @@
                             {{ team.team_name }}
                             <span class="dropdown-icon collapsed" data-toggle="collapse" data-target="#team_details_{{ team.team_id }}" aria-expanded="false" aria-controls="team_details_{{ team.team_id }}">&#9660;</span>
                         </h6>
+                        <div class="btn btn-sm btn-primary">
+                            <a href="{{ url_for('employee_routes.add_event', team_id=team.team_id) }}" class="text-white">Add Event</a>
+                        </div>
+                        
                     </div>
                     <div id="team_details_{{ team.team_id }}" class="collapse team-details">
                         <div class="card card-body">
@@ -141,6 +145,7 @@
                             <div class="scrollable-list">
                                 <ul class="list-group">
                                     {% if team_data[team]['supervisor'] %}
+                                        
                                         <li class="list-group-item d-flex">
                                             <div class="row">
                                                 <p class="col-auto"><strong>Supervisor Name:</strong> {{ team_data[team]['supervisor']['fullname'] }} </p> 

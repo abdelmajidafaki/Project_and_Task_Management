@@ -146,7 +146,29 @@
         {% endfor %}
     </ul>
 {% endif %}
-
+<h2>Personal Tasks</h2>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Task Name</th>
+                    <th>Description</th>
+                    <th>Do At</th>
+                    <th>Completed At</th>
+                    <th>State</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in personal_tasks %}
+                <tr>
+                    <td><a class="card-link" href="{{url_for('admin_routes.employepertask', token=task.token)}}">{{ task.TaskName }}</a></td>
+                    <td>{{ task.Description or 'N/A' }}</td>
+                    <td>{{ task.DoAt.strftime('%Y-%m-%d') if task.DoAt else '' }}</td>
+                    <td>{{ task.CompletedAt.strftime('%Y-%m-%d') if task.CompletedAt else '' }}</td>
+                    <td>{{ task.State }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
 {% if supervised_teams %}
     <h4 class="mt-4">Teams Supervised</h4>
     <ul>
@@ -178,7 +200,7 @@
       {% if user.usertype == 'Admin' %}
         <h4 class="mb-4"> Created Projects</h4>
         {%else %}
-        <h4 class="mb-4"> Created Projects</h4>
+        <h4 class="mb-4"> Assigned Projects</h4>
         {%endif%}
         <div class="col-auto mb-3">
           <select class="form-control" id="statusFilter">
@@ -263,7 +285,7 @@
                       {% if task.close_date %}
                         <p class="card-text">Close Date: {{ task.close_date.strftime('%Y-%m-%d') }}</p>
                       {% endif %}
-                      <p class="card-text">Assigned to: {{ admin_name }}</p>
+                      <p class="card-text">Created By: {{ admin_name }}</p>
                       {% if daystoclose is not none and daystoclose < 3 and daystoclose >0 %}
                         <p class="card-text text-center text-white bg-danger">
                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-exclamation-triangle mb-1" viewBox="0 0 16 16">
@@ -337,7 +359,6 @@
                       {% if task.close_date %}
                         <p class="card-text">Close Date: {{ task.close_date.strftime('%Y-%m-%d') }}</p>
                       {% endif %}
-                      <p class="card-text">Assigned by: {{ admin_name }}</p>
                       {% if daystoclose is not none and daystoclose < 3 and daystoclose >0 %}
                         <p class="card-text text-center text-white bg-danger">
                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-exclamation-triangle mb-1" viewBox="0 0 16 16">

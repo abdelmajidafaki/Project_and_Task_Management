@@ -6,3 +6,4 @@ from flask_login import LoginManager
 db = SQLAlchemy()
 bcrypt = Bcrypt()
 login_manager = LoginManager()
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
