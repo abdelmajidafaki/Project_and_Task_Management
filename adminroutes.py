@@ -53,15 +53,24 @@ def update_status(userid):
         flash("User not found.", 'danger')
         return redirect(url_for('admin_routes.usersdashboard'))
 
+    action = request.form.get('action')
     usertype = request.form.get('usertype')
-    if usertype in ['Admin', 'employee']:
+
+    if action == 'activate':
+        user.status = 'active'
+        flash("User activated successfully.", 'success')
+    elif action == 'deactivate':
+        user.status = 'inactive'
+        flash("User deactivated successfully.", 'success')
+    elif usertype in ['Admin', 'employee']:
         user.usertype = usertype
         flash(f"User type updated successfully to {usertype}.", 'success')
     else:
-        flash("Invalid user type selected.", 'danger')
+        flash("Invalid user type or action selected.", 'danger')
 
     db.session.commit()
     return redirect(url_for('admin_routes.usersdashboard'))
+
 
 
 @admin_routes.route("/usersdashboard/userdetails/<Utoken>", methods=['GET', 'POST'])
