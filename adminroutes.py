@@ -1,10 +1,11 @@
-from flask import Blueprint, render_template, request, flash, redirect, url_for,jsonify,session
+from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify, session
 from flask_login import login_required, current_user
-from extensions import db
-from modals import users, Event,Task, TaskAssignment, Task_Progression,EventEmployee, PersonalTask, EventTeam,PersonalTaskProgression,Teams,TeamsMember,Project,ProjectTeam
+from extensions import db, bcrypt, ALLOWED_EXTENSIONS
+from modals import users, Event, Task, TaskAssignment, Task_Progression, EventEmployee, PersonalTask, PersonalTaskProgression, Teams, TeamsMember, Project, ProjectTeam, EventTeam
 from datetime import datetime, date, timezone
 import secrets
 from functools import wraps
+from utils import get_task_status, calculate_days_to_close, sort_tasks
 
 admin_routes = Blueprint('admin_routes', __name__)
 
@@ -18,54 +19,21 @@ def admin_required(func):
     return decorated_function
 
 def get_user_or_redirect(user_id):
-    user = users.query.filter_by(userid=user_id).first()
+    user = users.query.get(user_id)
     if not user or user.usertype != "Admin":
         flash("You are not logged in or do not have permission to access this page.", 'danger')
         return redirect(url_for('auth_routes.loginpage'))
     return user
 
-def get_task_status(task):
-    today = date.today()
-    if task.start_date > today:
-        return "Upcoming"
-    elif task.start_date <= today and (task.close_date is None or task.close_date >= today) and task.status == 'In Progress':
-        return "Open"
-    elif task.status == 'COMPLETED':
-        return "Closed"
-    else:
-        return "Closed"
-
-def calculate_days_to_close(task, today):
-    if task.close_date and task.status == "In Progress":
-        return (task.close_date - today).days
-    return None
-
-def sort_tasks(tasks):
-    def to_datetime(d):
-        return datetime.combine(d, datetime.min.time()) if isinstance(d, date) else d or datetime.max
-
-    def sort_key(task_info):
-        task, _, _, _, status, _ = task_info  # Adjust to 6 elements
-        start_date = to_datetime(task.start_date)
-        close_date = to_datetime(task.close_date)
-        if status == 'Open':
-            return (0, close_date)
-        elif status == 'Upcoming':
-            return (1, start_date)
-        else:
-            return (2, datetime.max)
-
-    tasks.sort(key=sort_key)
-    return tasks
-
 def get_project_status(project):
     today = date.today()
-    if project.start_date > today :
+    if project.start_date > today:
         return "Upcoming"
-    elif project.start_date <= today and (project.end_date is None or project.end_date >= today) and project.statut=='in progress':
+    elif project.start_date <= today and (project.end_date is None or project.end_date >= today) and project.statut == 'in progress':
         return "Open"
     else:
         return "Closed"
+
 #---------------------------------------------------------------users-------------------------------------------------------------------
 
 @admin_routes.route("/usersdashboard", methods=['GET', 'POST'])
@@ -80,25 +48,19 @@ def usersdashboard():
 @login_required
 @admin_required
 def update_status(userid):
-    user = users.query.filter_by(userid=userid).first()
+    user = users.query.get(userid)
     if not user:
         flash("User not found.", 'danger')
         return redirect(url_for('admin_routes.usersdashboard'))
 
-    if 'action' in request.form:
-        action = request.form['action']
-        if action in ['activate', 'deactivate']:
-            user.status = 'active' if action == 'activate' else 'inactive'
-            flash(f"User status updated successfully ({action})", 'success')
-        db.session.commit()
+    usertype = request.form.get('usertype')
+    if usertype in ['Admin', 'employee']:
+        user.usertype = usertype
+        flash(f"User type updated successfully to {usertype}.", 'success')
+    else:
+        flash("Invalid user type selected.", 'danger')
 
-    elif 'usertype' in request.form:
-        usertype = request.form['usertype']
-        if usertype in ['Admin', 'employee']:
-            user.usertype = usertype
-            flash(f"User type updated successfully ({usertype})", 'success')
-        db.session.commit()
-
+    db.session.commit()
     return redirect(url_for('admin_routes.usersdashboard'))
 
 
@@ -108,75 +70,87 @@ def update_status(userid):
 def userdetails(Utoken):
     user = users.query.filter_by(Utoken=Utoken).first_or_404()
     personal_tasks = PersonalTask.query.filter_by(employee_id=user.userid).all()
-    
-    assigned_tasks = Task.query.join(TaskAssignment, Task.task_id == TaskAssignment.task_id) \
-                               .filter(TaskAssignment.employee_id == user.userid).all()
-    
+    assigned_tasks = Task.query.join(TaskAssignment).filter(TaskAssignment.employee_id == user.userid).all()
     now = datetime.now(tz=timezone.utc).date()
     tasks = []
-    teams = []  
+    teams = []
     supervised_teams = []
+
     if user.usertype == 'Admin':
         created_tasks = Task.query.filter(Task.admin_id == user.userid).all()
         for task in created_tasks:
-            start_date = task.start_date if isinstance(task.start_date, datetime) else datetime.combine(task.start_date, datetime.min.time(), tzinfo=timezone.utc)
-            close_date = task.close_date if isinstance(task.close_date, datetime) else datetime.combine(task.close_date, datetime.min.time(), tzinfo=timezone.utc) if task.close_date else None
-            
             status = get_task_status(task)
             daystoclose = calculate_days_to_close(task, now)
-            tasks.append((task, user.fulname, status, daystoclose))
-        
+            admin_name = user.fulname if user.fulname else 'No Admin'
+            tasks.append((task, admin_name, status, daystoclose))
         projects = Project.query.filter(Project.created_by == user.userid).all()
     else:
         for task in assigned_tasks:
-            start_date = task.start_date if isinstance(task.start_date, datetime) else datetime.combine(task.start_date, datetime.min.time(), tzinfo=timezone.utc)
-            close_date = task.close_date if isinstance(task.close_date, datetime) else datetime.combine(task.close_date, datetime.min.time(), tzinfo=timezone.utc) if task.close_date else None
-            
             status = get_task_status(task)
             daystoclose = calculate_days_to_close(task, now)
-            tasks.append((task, task.admin.fulname, status, daystoclose))
-
+            admin_name = task.admin.fulname if task.admin and task.admin.fulname else 'No Admin'
+            tasks.append((task, admin_name, status, daystoclose))
         teams = Teams.query.join(TeamsMember).filter(TeamsMember.userid == user.userid).all()
-
         team_ids = [team.team_id for team in teams]
         projects = Project.query.join(ProjectTeam).filter(ProjectTeam.team_id.in_(team_ids)).distinct().all()
         supervised_teams = Teams.query.filter_by(supervisor_id=user.userid).all()
 
     for project in projects:
-        project.status = get_project_status(project) 
-    
-    return render_template("admin/userdetails.html", user=user, personal_tasks=personal_tasks, tasks=tasks, teams=teams, supervised_teams=supervised_teams, projects=projects)
+        project.status = get_project_status(project)
 
+    return render_template(
+        "admin/userdetails.html",
+        user=user,
+        personal_tasks=personal_tasks,
+        tasks=tasks,
+        teams=teams,
+        supervised_teams=supervised_teams,
+        projects=projects
+    )
 
-@admin_routes.route('/usersdashboard/userdetails/employepertask/<string:token>')
+@admin_routes.route('/delete_user/<int:userid>', methods=['POST'])
 @login_required
 @admin_required
-def employepertask(token):
-    task = PersonalTask.query.filter_by(token=token).first_or_404()
-    task_progressions = PersonalTaskProgression.query.filter_by(Ptask_id=task.PTDID).all()
-    return render_template("admin/employeeperstask.html", task=task, task_progressions=task_progressions)
+def delete_user(userid):
+    user = users.query.get(userid)
+    if user:
+        try:
+            Task_Progression.query.filter_by(employee_id=userid).update({'employee_id': None})
+            TaskAssignment.query.filter_by(employee_id=userid).update({'employee_id': None})
+            PersonalTaskProgression.query.filter_by(employee_id=userid).delete()
+            PersonalTask.query.filter_by(employee_id=userid).delete()
+            TeamsMember.query.filter_by(userid=userid).delete()
+            Event.query.filter_by(creator_id=userid).update({'creator_id': None})
+            EventEmployee.query.filter_by(employee_id=userid).delete()
+            db.session.delete(user)
+            db.session.commit()
+            flash('User deleted successfully.', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error deleting user: {str(e)}', 'danger')
+    else:
+        flash('User not found.', 'danger')
+    return redirect(url_for('admin_routes.usersdashboard'))
 
 #---------------------------------------------------------------teams-------------------------------------------------------------------
+
 @admin_routes.route('/teams', methods=['GET'])
 @login_required
 @admin_required
 def teams():
     all_teams = Teams.query.all()
-    all_users = users.query.all()  
+    all_users = users.query.all()
     all_projects = Project.query.all()
     team_data = {}
     for team in all_teams:
-
         team_members = TeamsMember.query.filter_by(team_id=team.team_id).all()
         member_ids = [member.userid for member in team_members]
         members = users.query.filter(users.userid.in_(member_ids)).all()
         supervisor = users.query.get(team.supervisor_id) if team.supervisor_id else None
-
         associated_projects = [
-            project for project in all_projects 
+            project for project in all_projects
             if ProjectTeam.query.filter_by(team_id=team.team_id, project_id=project.project_id).first()
         ]
-
         team_data[team] = {
             'members': members,
             'supervisor': supervisor,
@@ -184,23 +158,24 @@ def teams():
         }
     return render_template('admin/teams/teams.html', team_data=team_data, users=all_users)
 
-@admin_routes.route('/teams/Create_new_team', methods=['POST','GET'])
+@admin_routes.route('/teams/Create_new_team', methods=['POST', 'GET'])
+@login_required
+@admin_required
 def add_team():
     if request.method == 'POST':
         team_name = request.form['team_name']
         team_members = request.form.getlist('team_members')
         supervisor_id = request.form.get('supervisor_id')
-        new_team = Teams(team_name=team_name, supervisor_id=supervisor_id ,TETOKEN=secrets.token_urlsafe())
+        new_team = Teams(team_name=team_name, supervisor_id=supervisor_id, TETOKEN=secrets.token_urlsafe())
         db.session.add(new_team)
-        db.session.commit() 
+        db.session.commit()
         for member_id in team_members:
             team_member = TeamsMember(team_id=new_team.team_id, userid=member_id)
             db.session.add(team_member)
         db.session.commit()
         flash('Team added successfully!', 'success')
         return redirect(url_for('admin_routes.teams'))
-    
-    employees = users.query.filter_by(usertype='employee')
+    employees = users.query.filter_by(usertype='employee').all()
     return render_template('admin/teams/addteam.html', employees=employees)
 
 @admin_routes.route('/teams/update/<string:TETOKEN>', methods=['GET', 'POST'])
@@ -225,22 +200,20 @@ def update_team(TETOKEN):
     employees = users.query.filter_by(usertype='employee').all()
     return render_template('admin/teams/updateteam.html', team=team, employees=employees, team_member_ids=team_member_ids)
 
-@admin_routes.route('/teams/delete_team/<string:TETOKEN>', methods=['GET','POST'])
+@admin_routes.route('/teams/delete_team/<string:TETOKEN>', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def delete_team(TETOKEN):
     team = Teams.query.filter_by(TETOKEN=TETOKEN).first()
-    EventTeam.query.filter_by(team_id=team.team_id).delete()
-    ProjectTeam.query.filter_by(team_id=team.team_id).delete()
-
-    if not team:
+    if team:
+        EventTeam.query.filter_by(team_id=team.team_id).delete()
+        ProjectTeam.query.filter_by(team_id=team.team_id).delete()
+        TeamsMember.query.filter_by(team_id=team.team_id).delete()
+        db.session.delete(team)
+        db.session.commit()
+        flash('Team deleted successfully!', 'success')
+    else:
         flash('Team not found', 'danger')
-        return redirect(url_for('admin_routes.teams'))
-    TeamsMember.query.filter_by(team_id=team.team_id).delete()
-    db.session.delete(team)  
-    db.session.commit()
-
-    flash('Team deleted successfully!', 'success')
     return redirect(request.referrer)
 
 @admin_routes.route('/teams/<int:team_id>/add_member_to_team', methods=['POST'])
@@ -259,17 +232,14 @@ def add_member_to_team(team_id):
                     db.session.add(new_member)
                 else:
                     flash(f'User {user.fulname} is already a member of the team.', 'warning')
-
             if position == 'supervisor':
                 team.supervisor_id = user.userid
-
     try:
         db.session.commit()
         flash('Members added successfully.', 'success')
     except Exception as e:
         db.session.rollback()
         flash('An error occurred while adding members.', 'danger')
-
     return redirect(url_for('admin_routes.teams'))
 
 @admin_routes.route('/teams/<int:team_id>/remove_member/<int:member_id>', methods=['POST'])
@@ -277,30 +247,23 @@ def add_member_to_team(team_id):
 @admin_required
 def remove_member_from_team(team_id, member_id):
     team_member = TeamsMember.query.filter_by(team_id=team_id, userid=member_id).first()
-    
-    if not team_member:
+    if team_member:
+        try:
+            db.session.delete(team_member)
+            projects = Project.query.join(ProjectTeam).filter(ProjectTeam.team_id == team_id).all()
+            for project in projects:
+                tasks = Task.query.filter_by(project_id=project.project_id).all()
+                for task in tasks:
+                    task_assignment = TaskAssignment.query.filter_by(task_id=task.task_id, employee_id=member_id).first()
+                    if task_assignment:
+                        db.session.delete(task_assignment)
+            db.session.commit()
+            flash('Member removed and tasks unassigned successfully.', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred while removing the member and unassigning tasks.', 'danger')
+    else:
         flash('Member not found in this team.', 'danger')
-        return redirect(url_for('admin_routes.teams'))
-
-
-    try:
-        db.session.delete(team_member)
-        
-        projects = Project.query.join(ProjectTeam).filter(ProjectTeam.team_id == team_id).all()
-
-        for project in projects:
-            tasks = Task.query.filter_by(project_id=project.project_id).all()
-            for task in tasks:
-                task_assignment = TaskAssignment.query.filter_by(task_id=task.task_id, employee_id=member_id).first()
-                if task_assignment:
-                    db.session.delete(task_assignment)
-                
-        db.session.commit()
-        flash('Member removed and tasks unassigned successfully.', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash('An error occurred while removing the member and unassigning tasks.', 'danger')
-
     return redirect(request.referrer)
 
 #---------------------------------------------------------------tasks-------------------------------------------------------------------
@@ -330,9 +293,9 @@ def tasks():
     tasks = []
 
     for task in tasksq:
-        admin_name = task.admin.fulname
-        project_name = task.project.project_name if task.project else None
-        employee_names = [assignment.employee.fulname for assignment in task.assignments]
+        admin_name = task.admin.fulname if task.admin else 'No Admin'
+        project_name = task.project.project_name if task.project else 'No Project'
+        employee_names = [assignment.employee.fulname for assignment in task.assignments if assignment.employee]
 
         status = get_task_status(task)
         daystoclose = calculate_days_to_close(task, today)
@@ -341,7 +304,7 @@ def tasks():
 
     tasks = sort_tasks(tasks)
 
-    return render_template("admin/tasks/tasks.html", tasks=tasks, projects=project_names )
+    return render_template("admin/tasks/tasks.html", tasks=tasks, projects=project_names)
 
 @admin_routes.route('/update_task_statut', methods=['POST'])
 @login_required
@@ -351,10 +314,10 @@ def update_task_statut():
     task = Task.query.get(task_id)
     if not task:
         flash('Task not found', 'danger')
-        return redirect(request.referrer)  
-    
+        return redirect(request.referrer)
+
     status = get_task_status(task)
-    
+
     if 'opentask' in request.form:
         if status in ['Upcoming', 'Closed']:
             task.start_date = datetime.today().date()
@@ -364,9 +327,8 @@ def update_task_statut():
 
     db.session.commit()
     flash(f'Task is now {task.status.lower()}', 'success')
-    
-    return redirect(request.referrer)  
 
+    return redirect(request.referrer)
 
 @admin_routes.route("/tasks/Create_new_task", methods=['GET', 'POST'])
 @login_required
@@ -463,7 +425,7 @@ def addnewtask():
 
     employees = [{'userid': e.userid, 'fulname': e.fulname} for e in users.query.filter_by(usertype='employee').all()]
     projects = Project.query.all()
-    
+
     project_teams = {}
     for project in projects:
         teams = Teams.query.join(ProjectTeam).filter(ProjectTeam.project_id == project.project_id).all()
@@ -473,13 +435,12 @@ def addnewtask():
         project_teams[project.token] = team_members or []
 
     return render_template(
-        "admin/tasks/addtasks.html", 
-        employees=employees, 
-        projects=projects, 
-        project_teams=project_teams, 
+        "admin/tasks/addtasks.html",
+        employees=employees,
+        projects=projects,
+        project_teams=project_teams,
         selected_project_token=project_token
     )
-
 
 @admin_routes.route("/tasks/delete/<int:task_id>", methods=['POST'])
 @login_required
@@ -528,7 +489,7 @@ def update_task(token):
         except ValueError:
             flash('Invalid start date format.', 'danger')
             return render_template("admin/tasks/update_task.html", task=task, project_teams=project_teams, employees=employees_list, projects=projects, selected_employee_ids=selected_employee_ids)
-        
+
         if start_date < date.today():
             flash('Start date cannot be in the past.', 'danger')
             return render_template("admin/tasks/update_task.html", task=task, project_teams=project_teams, employees=employees_list, projects=projects, selected_employee_ids=selected_employee_ids)
@@ -573,7 +534,7 @@ def projects():
     if request.method == 'POST':
         project_id = request.form.get('project_id')
         project = Project.query.get(project_id)
-        
+
         if project:
             today = datetime.today().date()
             if 'open' in request.form:
@@ -658,13 +619,12 @@ def create_project():
     teams = Teams.query.all()
     return render_template('admin/projects/addproject.html', teams=teams)
 
-
 @admin_routes.route('/projects/update/<string:token>', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def update_project(token):
     project = Project.query.filter_by(token=token).first_or_404()
-    all_teams = Teams.query.all()  
+    all_teams = Teams.query.all()
 
     if request.method == 'POST':
         project_name = request.form['project_name']
@@ -672,7 +632,7 @@ def update_project(token):
         end_date_str = request.form['end_date']
         description = request.form['description']
         selected_team_ids = request.form.getlist('teams')
-        
+
         try:
             start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
         except ValueError:
@@ -708,7 +668,6 @@ def update_project(token):
 
     return render_template('admin/projects/update_project.html', project=project, all_teams=all_teams)
 
-
 @admin_routes.route('/projects/delete/<int:project_id>', methods=['POST'])
 @login_required
 @admin_required
@@ -723,12 +682,10 @@ def delete_project(project_id):
     flash('Project deleted successfully!', 'success')
     return redirect(request.referrer)
 
-
 @admin_routes.route("/projects/project_details/<string:token>", methods=['GET', 'POST'])
 @login_required
 @admin_required
 def project_details(token):
-    
     if request.method == 'POST':
         project_id = request.form.get('project_id')
         project = Project.query.get(project_id)
@@ -748,14 +705,14 @@ def project_details(token):
     if not project:
         flash('Project not found.', 'danger')
         return redirect(url_for('admin_routes.projects'))
-    
+
     tasks = Task.query.filter_by(project_id=project.project_id).all()
     teams = Teams.query.join(ProjectTeam).filter(ProjectTeam.project_id == project.project_id).all()
     status = get_project_status(project)
     team_ids = db.session.query(Teams.team_id).join(ProjectTeam).filter(ProjectTeam.project_id == project.project_id).all()
     team_ids = [team_id for (team_id,) in team_ids]
     is_supervisor = db.session.query(Teams).filter(Teams.team_id.in_(team_ids), Teams.supervisor_id == current_user.userid).first() is not None
-    
+
     team_details = []
     for team in teams:
         supervisor = users.query.filter_by(userid=team.supervisor_id).first()
@@ -767,7 +724,6 @@ def project_details(token):
         })
 
     return render_template('admin/projects/projectdetails.html', project=project, status=status, tasks=tasks, team_details=team_details)
-
 
 @admin_routes.route('/update_project_statut', methods=['POST'])
 @login_required
@@ -791,7 +747,7 @@ def update_project_statut():
         else:
             flash('Project not found.', 'danger')
         return redirect(request.referrer)
-    
+
 #---------------------------------------------------------------calendar-------------------------------------------------------------------
 
 @admin_routes.route('/calendar')
@@ -872,7 +828,7 @@ def update_event(token):
         except Exception as e:
             db.session.rollback()
             flash(f'An error occurred: {e}', 'danger')
-        
+
         return redirect(request.referrer)
 
     teams = Teams.query.all()
@@ -902,7 +858,6 @@ def delete_event(token):
         print(f"Error deleting event: {e}")
         return jsonify({'status': 'error', 'message': 'An error occurred while deleting the event.'}), 500
 
-
 @admin_routes.route('/calendar/calendar/add_event', methods=['GET', 'POST'])
 @login_required
 @admin_required
@@ -919,7 +874,7 @@ def add_event():
             if start_date < datetime.combine(date.today(), datetime.min.time()):
                 flash('Start date cannot be in the past.', 'danger')
                 return render_template('admin/addevent.html', teams_data=teams_data, employees_data=employees_data)
-            new_event = Event(title=title, At=start_date, token=secrets.token_urlsafe(), salle=salle,creator_id=current_user.userid)
+            new_event = Event(title=title, At=start_date, token=secrets.token_urlsafe(), salle=salle, creator_id=current_user.userid)
             db.session.add(new_event)
             db.session.commit()
             for team_id in team_ids:
@@ -932,7 +887,7 @@ def add_event():
             db.session.commit()
             flash('Event added successfully!', 'success')
         except Exception as e:
-            db.session.rollback()  
+            db.session.rollback()
             flash(f'An error occurred: {e}', 'danger')
         return redirect(request.referrer)
     teams = Teams.query.all()
@@ -941,3 +896,80 @@ def add_event():
     employees_data = [{'userid': emp.userid, 'fulname': emp.fulname, 'usertype': emp.usertype, 'teams': [team.team_id for team in emp.team_memberships]} for emp in employees]
 
     return render_template('admin/addevent.html', teams_data=teams_data, employees_data=employees_data)
+#----------------------------------------------------account----------------------------------------------------------------------------------
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@admin_routes.route('/profile/<string:Utoken>', methods=['GET', 'POST'])
+@login_required
+def profile(Utoken):
+    user = users.query.filter_by(Utoken=Utoken).first()
+
+    if request.method == 'POST':
+        if 'profile_picture' in request.files:
+            file = request.files['profile_picture']
+            if file and allowed_file(file.filename):
+                image_binary = file.read()
+                print(len(image_binary))
+                user.profile_picture = image_binary
+                db.session.commit()
+
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'status': 'success'}), 200
+
+                return redirect(url_for('employee_routes.profile', Utoken=user.Utoken))
+
+    return render_template('components/account.html', user=user)
+
+@admin_routes.route('/change_full_name/<Utoken>', methods=['POST'])
+@login_required
+def change_full_name(Utoken):
+    user = users.query.filter_by(Utoken=Utoken).first()
+
+    new_full_name = request.form.get('new_full_name')
+    current_password = request.form.get('current_password')
+
+    if bcrypt.check_password_hash(user.Pasword, current_password):
+        user.fulname = new_full_name
+        db.session.commit()
+        flash('Full name updated successfully', 'success')
+    else:
+        flash('Current password is incorrect', 'danger')
+
+    return redirect(url_for('employee_routes.profile', Utoken=Utoken))
+
+@admin_routes.route('/change_email/<Utoken>', methods=['POST'])
+@login_required
+def change_email(Utoken):
+    user = users.query.filter_by(Utoken=Utoken).first()
+    new_email = request.form.get('new_email')
+    password_confirmation = request.form.get('password_confirmation')
+
+    if bcrypt.check_password_hash(user.Pasword, password_confirmation):
+        user.email = new_email
+        db.session.commit()
+        flash('Email updated successfully', 'success')
+    else:
+        flash('Password confirmation is incorrect', 'danger')
+
+    return redirect(url_for('employee_routes.profile', Utoken=Utoken))
+
+@admin_routes.route('/change_password/<Utoken>', methods=['POST'])
+@login_required
+def change_password(Utoken):
+    user = users.query.filter_by(Utoken=Utoken).first()
+    current_password = request.form.get('current_password')
+    new_password = request.form.get('new_password')
+    confirm_new_password = request.form.get('confirm_new_password')
+    if bcrypt.check_password_hash(user.Pasword, current_password):
+        if new_password == confirm_new_password:
+            user.Pasword = bcrypt.generate_password_hash(new_password)
+            db.session.commit()
+            flash('Password updated successfully', 'success')
+        else:
+            flash('New passwords do not match', 'danger')
+    else:
+        flash('Current password is incorrect', 'danger')
+
+    return redirect(url_for('employee_routes.profile', Utoken=Utoken))

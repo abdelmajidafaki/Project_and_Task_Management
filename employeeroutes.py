@@ -4,8 +4,6 @@ from extensions import db,ALLOWED_EXTENSIONS,bcrypt
 from functools import wraps
 from modals import users, Task, TaskAssignment, Event,Task_Progression,EventEmployee, EventTeam,PersonalTask, PersonalTaskProgression,Teams,TeamsMember,Project,ProjectTeam
 import secrets
-from werkzeug.utils import secure_filename
-import base64
 from sqlalchemy.orm import joinedload
 from datetime import datetime, date
 
@@ -56,7 +54,6 @@ def get_project_status(project):
     else:
         return "Closed"
 #-----------------------------------------------------tasks-----------------------------------------------------------------
-
 @employee_routes.route("/Assignedtasks", methods=['GET', 'POST'])
 @login_required
 @employee_required
@@ -64,37 +61,41 @@ def Assignedtasks():
     user_id = current_user.userid
     user = users.query.get(user_id)
 
-    if user:
-        assigned_tasks = db.session.query(Task) \
-            .join(TaskAssignment, Task.task_id == TaskAssignment.task_id) \
-            .filter(TaskAssignment.employee_id == user_id) \
-            .all()
-
-        tasks = [(task, task.admin.fulname, *get_task_status(task)) for task in assigned_tasks]
-
-        def to_datetime(d):
-            if isinstance(d, datetime):
-                return d
-            elif isinstance(d, date):
-                return datetime.combine(d, datetime.min.time())
-            return datetime.max
-        
-        def sort_key(task_info):
-            task, _, status, daystoclose = task_info
-            start_date = to_datetime(task.start_date)
-            close_date = to_datetime(task.close_date)
-            if status == 'Open':
-                return (0, close_date)
-            elif status == 'Upcoming':
-                return (1, start_date)
-            return (2, datetime.max)
-        
-        tasks.sort(key=sort_key)
-
-        return render_template("employee/Asyntasks/employeepage.html", user=user, tasks=tasks)
-    else:
+    if user is None:
         flash("User not found. Please log in again.", 'danger')
         return redirect(url_for('auth_routes.loginpage'))
+
+    assigned_tasks = db.session.query(Task) \
+        .join(TaskAssignment, Task.task_id == TaskAssignment.task_id) \
+        .filter(TaskAssignment.employee_id == user_id) \
+        .all()
+
+    tasks = []
+    for task in assigned_tasks:
+        admin_name = task.admin.fulname if task.admin else "Unknown Admin"
+        status, daystoclose = get_task_status(task)
+        tasks.append((task, admin_name, status, daystoclose))
+
+    def to_datetime(d):
+        if isinstance(d, datetime):
+            return d
+        elif isinstance(d, date):
+            return datetime.combine(d, datetime.min.time())
+        return datetime.max
+    
+    def sort_key(task_info):
+        task, _, status, daystoclose = task_info
+        start_date = to_datetime(task.start_date)
+        close_date = to_datetime(task.close_date)
+        if status == 'Open':
+            return (0, close_date)
+        elif status == 'Upcoming':
+            return (1, start_date)
+        return (2, datetime.max)
+    
+    tasks.sort(key=sort_key)
+
+    return render_template("employee/Asyntasks/employeepage.html", user=user, tasks=tasks)
 
 @employee_routes.route("/Assignedtasks/taskdetails/<token>/<etoken>", methods=['GET', 'POST'])
 @login_required
@@ -320,7 +321,6 @@ def addpersonalprogression(Ptoken):
     
     return render_template('employee/persotasks/add_personal_progression.html', task=task)
 #------------------------------------------------------teams-----------------------------------------------------------------
-
 @employee_routes.route('/teams', methods=['GET'])
 @employee_required
 @login_required
@@ -333,7 +333,7 @@ def employee_teams():
     for team in teams:
         team_members = [{'fullname': member.fulname, 'email': member.email} for member in team.members]
         supervisor_info = {
-            'fullname': team.supervisor.fulname if team.supervisor else None,
+            'fullname': team.supervisor.fulname if team.supervisor else "Unknown Supervisor",
             'email': team.supervisor.email if team.supervisor else None
         } if team.supervisor else None
         team_data[team] = {
@@ -740,7 +740,7 @@ def profile(Utoken):
                 
                 return redirect(url_for('employee_routes.profile', Utoken=user.Utoken))
     
-    return render_template('employee/account.html', user=user)
+    return render_template('components/account.html', user=user)
 
 
 @employee_routes.route('/change_full_name/<Utoken>', methods=['POST'])

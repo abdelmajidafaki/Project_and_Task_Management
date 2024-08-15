@@ -65,11 +65,44 @@
         overflow: hidden;   
         text-overflow: ellipsis; 
         }
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+            
+        }
+        .content {
+
+            flex: 1;
+            margin-top: 100px;
+            margin-bottom: 100px;
+        }
+        .navbar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000; 
+
+        }
+        footer {
+            background-color: #004b8d;
+            color: white;
+            text-align: center;
+            padding: 20px 0;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
+    <nav class="navbar  navbar-expand-lg  mb-4 px-5 " style="background-color:#0074d9;">
         {% include 'components/enavbar.html' %}
+    </nav>
+    <div class="content">
+    <div class="container">
+
         <h2>Assigned Tasks:</h2>
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -144,7 +177,10 @@
             {% endfor %}
         </div>
     </div>
-    
+</div>
+<footer>
+    {% include 'components/footer.html' %} 
+</footer>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>

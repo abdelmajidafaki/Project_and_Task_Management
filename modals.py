@@ -31,10 +31,10 @@ class Task(db.Model):
     start_date = db.Column(db.Date)
     close_date = db.Column(db.Date)
     description = db.Column(db.Text, nullable=True)
-    admin_id = db.Column(db.Integer, db.ForeignKey('users.userid'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('users.userid', ondelete='SET NULL'), nullable=True)
     status = db.Column(db.String(20), default='In Progress')
     token = db.Column(db.String(64), unique=True, nullable=False, default=lambda: secrets.token_urlsafe())
-    project_id = db.Column(db.Integer, db.ForeignKey('projects.project_id'), nullable=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.project_id', ondelete='SET NULL'), nullable=True)
 
     admin = db.relationship("users", foreign_keys=[admin_id], back_populates="tasks_assigned")
     project = db.relationship("Project", back_populates="tasks")
@@ -43,11 +43,14 @@ class Task(db.Model):
 
 class TaskAssignment(db.Model):
     __tablename__ = 'task_assignments'
-    task_id = db.Column(db.Integer, db.ForeignKey('tasks.task_id'), primary_key=True)
-    employee_id = db.Column(db.Integer, db.ForeignKey('users.userid'), primary_key=True)
 
+    task_id = db.Column(db.Integer, db.ForeignKey('tasks.task_id', ondelete='CASCADE'), primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey('users.userid', ondelete='SET NULL'), nullable=True)
+
+    # Relationships
     task = db.relationship("Task", back_populates="assignments")
     employee = db.relationship("users", back_populates="assigned_tasks")
+
 
 class Task_Progression(db.Model):
     __tablename__ = 'task_progression'
@@ -56,8 +59,8 @@ class Task_Progression(db.Model):
     start_at = db.Column(db.Date, nullable=False)
     end_at = db.Column(db.Date, nullable=True)
     statut = db.Column(db.String(255), nullable=True, default='inprogress')
-    task_id = db.Column(db.Integer, db.ForeignKey('tasks.task_id'), nullable=False)
-    employee_id = db.Column(db.Integer, db.ForeignKey('users.userid'), nullable=False)
+    employee_id = db.Column(db.Integer, db.ForeignKey('users.userid', ondelete='SET NULL'), nullable=True)
+    task_id = db.Column(db.Integer, db.ForeignKey('tasks.task_id', ondelete='CASCADE'), nullable=False)
 
     task_ref = db.relationship('Task', back_populates='task_progressions')
     employee = db.relationship('users', back_populates='task_progressions')

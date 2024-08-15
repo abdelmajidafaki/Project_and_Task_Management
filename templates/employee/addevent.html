@@ -5,10 +5,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Add Event</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
+    <style>
+              html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+            
+        }
+        .content {
+
+            flex: 1;
+            margin-top: 100px;
+            margin-bottom: 100px;
+        }
+        .navbar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000; 
+
+        }
+        footer {
+            background-color: #004b8d;
+            color: white;
+            text-align: center;
+            padding: 20px 0;
+        }
+    </style>
 </head>
 <body>
+  <nav class="navbar  navbar-expand-lg  mb-4 px-5 " style="background-color:#0074d9;">
+    {% include 'components/enavbar.html' %}
+</nav>  
+<div class="content"> 
+
     <div class="container">
-        {% include 'components/enavbar.html' %}
+
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           {% for category, message in messages %}
@@ -36,7 +72,10 @@
             <a href="{{ url_for('employee_routes.calendar') }}" class="btn btn-secondary">Cancel</a>
         </form>
     </div>
-
+  </div>
+  <footer>
+    {% include 'components/footer.html' %} 
+</footer>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </body>

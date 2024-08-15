@@ -4,12 +4,47 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Add Personal Task</title>
-    <!-- Bootstrap CSS -->
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+                html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+            
+        }
+        .content {
+
+            flex: 1;
+            margin-top: 100px;
+            margin-bottom: 100px;
+        }
+        .navbar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000; 
+
+        }
+        footer {
+            background-color: #004b8d;
+            color: white;
+            text-align: center;
+            padding: 20px 0;
+        }
+    </style>
 </head>
 <body>
-    <div class="container ">
+    <nav class="navbar  navbar-expand-lg  mb-4 px-5 " style="background-color:#0074d9;">
         {% include 'components/enavbar.html' %}
+    </nav>  
+    <div class="content"> 
+
+    <div class="container ">
+
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -19,8 +54,8 @@
                 {% endfor %}
             {% endif %}
         {% endwith %}
-        <h1 class="mb-4">Add Personal Task</h1>
-        <form action="/employee/addpersonaltask" method="POST">
+        <h2 class="mb-4">Add Personal Task</h2>
+        <form action="{{url_for('employee_routes.addpertask')}}" method="POST">
             <div class="form-group">
                 <label for="taskName">Task Name</label>
                 <input type="text" class="form-control" id="taskName" name="taskName" required>
@@ -36,8 +71,10 @@
             <button type="submit" class="btn btn-primary">Add Task</button>
         </form>
     </div>
-
-    <!-- Bootstrap JS and dependencies -->
+</div>
+<footer>
+    {% include 'components/footer.html' %} 
+</footer>
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>

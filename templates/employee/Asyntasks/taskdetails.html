@@ -22,12 +22,43 @@
         .status-closed {
             background-color: #dc3545; 
         }
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+            
+        }
+        .content {
+
+            flex: 1;
+            margin-top: 100px;
+            margin-bottom: 100px;
+        }
+        .navbar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000; 
+
+        }
+        footer {
+            background-color: #004b8d;
+            color: white;
+            text-align: center;
+            padding: 20px 0;
+        }
     </style>
 </head>
 <body>
-
+    <nav class="navbar  navbar-expand-lg  mb-4 px-5 " style="background-color:#0074d9;">
+        {% include 'components/enavbar.html' %}
+    </nav>
+    <div class="content">
 <div class="container ">
-    {% include 'components/enavbar.html' %}
     {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -40,7 +71,7 @@
     <div class="card mt-4">
         <div class="card-body px-5">
             <div class="row">
-                <h1 class="card-title">Task Details</h1>
+                <h2 class="card-title">Task Details</h2>
                 <div class=" col-sm-2   mt-2">
                     <div class="status-label {% if status == 'Upcoming' %}
                                         status-upcoming{% elif status == 'Open' and task.status == 'In Progress' %}
@@ -75,7 +106,7 @@
                 {% for progression in task_progressions %}
                     <li class="list-group-item">
                         <p><strong>Progress Name:</strong> {{ progression.progname }}</p>
-                        <p><strong>Made By:</strong> {{ progression.employee.fulname }}</p>
+                        <p><strong>Made By:</strong> {{ progression.employee.fulname if progression.employee else 'Unknown Employee' }}</p>
                         <div class="row">
                         <p class="col-sm-6"><strong>Start At:</strong> {{ progression.start_at }}</p>
                         <p><strong>Completed at:</strong>
@@ -156,7 +187,10 @@
     
     
 </div>
-
+</div>
+<footer>
+    {% include 'components/footer.html' %} 
+</footer>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>

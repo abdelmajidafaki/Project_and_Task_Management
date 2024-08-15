@@ -1,31 +1,45 @@
-<nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
-    <a class="navbar-brand" href="{{ url_for('employee_routes.Assignedtasks') }}">Logo</a>
+
+    <a class="navbar-brand" href="{{ url_for('employee_routes.Assignedtasks') }}">        <img src="{{ url_for('static', filename='logo3.png') }}" alt="Logo" style="height: 20px; width: 150px;">
+    </a>
+
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ml-auto">
             <li class="nav-item {% if request.path.startswith(url_for('employee_routes.Assignedtasks'))%}active{%endif%}">
-                <a class="nav-link" href="{{ url_for('employee_routes.Assignedtasks') }}">Tasks</a>
+                <a class="nav-link  text-white" href="{{ url_for('employee_routes.Assignedtasks') }}">Tasks</a>
             </li>
             <li class="nav-item {% if request.path.startswith(url_for('employee_routes.personaltasks'))%}active{%endif%}" >
-                <a class="nav-link" href="{{ url_for('employee_routes.personaltasks') }}">Personal Tasks</a>
+                <a class="nav-link text-white" href="{{ url_for('employee_routes.personaltasks') }}">Personal Tasks</a>
             </li>
             <li class="nav-item {% if request.path.startswith(url_for('employee_routes.employee_projects'))%}active{%endif%}" >
-                <a class="nav-link" href="{{ url_for('employee_routes.employee_projects') }}">Team Projects</a>
+                <a class="nav-link text-white" href="{{ url_for('employee_routes.employee_projects') }}">Team Projects</a>
             </li>
             <li class="nav-item {% if request.path.startswith(url_for('employee_routes.employee_teams'))%}active{%endif%}" >
-                <a class="nav-link" href="{{ url_for('employee_routes.employee_teams') }}">My Teams</a>
+                <a class="nav-link text-white" href="{{ url_for('employee_routes.employee_teams') }}">My Teams</a>
             </li>
             <li class="nav-item {% if request.path.startswith(url_for('employee_routes.calendar')) %}active{% endif %}">
-                <a class="nav-link" href="{{ url_for('employee_routes.calendar') }}">Calendar</a>
+                <a class="nav-link text-white" href="{{ url_for('employee_routes.calendar') }}">Calendar</a>
             </li>
             <li class="nav-item {% if request.path.startswith(url_for('employee_routes.profile',Utoken=current_user.Utoken)) %}active{% endif %}">
-                <a class="nav-link" href="{{ url_for('employee_routes.profile',Utoken=current_user.Utoken) }}">MY Account</a>
+                <a class="nav-link text-white" href="{{ url_for('employee_routes.profile',Utoken=current_user.Utoken) }}">My Account</a>
             </li>
             <li class="nav-item ">
-                <a class="nav-link" href="{{ url_for('auth_routes.logout') }}">Logout</a>
+                <a class="nav-link text-white" href="{{ url_for('auth_routes.logout') }}">Logout</a>
             </li>
         </ul>
     </div>
-</nav>
+
+    <style>
+        .nav-link {
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+    
+        .nav-link:hover, .nav-item.active .nav-link {
+            background-color: #0056a3;
+            color: #ffffff;
+            border-radius: 5px; 
+        }
+    
+    </style>
