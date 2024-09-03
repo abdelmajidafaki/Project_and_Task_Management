@@ -47,7 +47,7 @@ class TaskAssignment(db.Model):
     task_id = db.Column(db.Integer, db.ForeignKey('tasks.task_id', ondelete='CASCADE'), primary_key=True)
     employee_id = db.Column(db.Integer, db.ForeignKey('users.userid', ondelete='SET NULL'), nullable=True)
 
-    # Relationships
+
     task = db.relationship("Task", back_populates="assignments")
     employee = db.relationship("users", back_populates="assigned_tasks")
 
@@ -100,7 +100,7 @@ class Teams(db.Model):
     supervisor = db.relationship('users', foreign_keys=[supervisor_id], back_populates='teams_supervised')
     members = db.relationship('users', secondary='teams_member', back_populates='team_memberships')
     team_projects = db.relationship('ProjectTeam', back_populates='team')
-    events = db.relationship('EventTeam', back_populates='team')  # Added this relationship
+    events = db.relationship('EventTeam', back_populates='team')  
 
 class TeamsMember(db.Model):
     __tablename__ = 'teams_member'

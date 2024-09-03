@@ -23,7 +23,7 @@ webapp.register_blueprint(auth_routes)
 webapp.register_blueprint(employee_routes, url_prefix='/employee')
 webapp.register_blueprint(admin_routes, url_prefix='/admin')
 
-webapp.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB limit
+webapp.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024 
 webapp.jinja_env.filters['b64encode'] = b64encode
 
 if __name__ == '__main__':

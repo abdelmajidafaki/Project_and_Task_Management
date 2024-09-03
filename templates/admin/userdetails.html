@@ -132,8 +132,16 @@
             <button type="submit" class="btn btn-danger btn-sm">Delete</button>
         </form>
         </div>
-       
-        <p><strong>Email:</strong> {{ user.email }}</p>
+        <div class="row">
+          <p class="col-auto"><strong>Email:</strong> {{ user.email }}</p>
+          <button type="button" class="btn btn-sm btn-primary" data-toggle="modal" data-target="#updateEmailModal">
+              Update Email
+          </button>
+          <button type="button" class="btn btn-sm btn-secondary" data-toggle="modal" data-target="#updatePasswordModal">
+              Update Password
+          </button>
+      </div>
+      
         <div>
           <table>
             <tr>
@@ -142,7 +150,7 @@
                 <div class="btn-container">
                   <form method="POST" action="{{ url_for('admin_routes.update_status', userid=user.userid) }}">
                     <button type="submit" name="action" value="activate" class="btn btn-sm btn-success mx-2">Activate</button>
-                    <button type="submit" name="action" value="deactivate" class="btn btn-danger mx-2">Deactivate</button>
+                    <button type="submit" name="action" value="deactivate" class="btn  btn-sm btn-danger mx-2">Deactivate</button>
                   </form>
                 </div>
               </td>
@@ -152,8 +160,8 @@
               <td class="text-center">
                 <div class="btn-container">
                   <form method="POST" action="{{ url_for('admin_routes.update_status', userid=user.userid) }}">
-                    <button type="submit" name="usertype" value="Admin" class="btn btn-success px-3 mr-2">Admin</button>
-                    <button type="submit" name="usertype" value="employee" class="btn btn-danger px-3 mx-1">Employee</button>
+                    <button type="submit" name="usertype" value="Admin" class="btn  btn-sm btn-success mr-2">Admin</button>
+                    <button type="submit" name="usertype" value="employee" class="btn  btn-sm btn-danger mx-1">Employee</button>
                   </form>
                 </div>
               </td>
@@ -440,7 +448,65 @@
           {% endif %}
         </div>
       {% endif %}
-</div></div>
+ <div class="modal fade" id="updateEmailModal" tabindex="-1" role="dialog" aria-labelledby="updateEmailModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+      <div class="modal-content">
+          <div class="modal-header">
+              <h5 class="modal-title" id="updateEmailModalLabel">Update Email</h5>
+              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+              </button>
+          </div>
+          <form method="POST" action="{{ url_for('admin_routes.update_Eemail', Utoken=user.Utoken) }}">
+              <div class="modal-body">
+                  <div class="form-group">
+                      <label for="newEmail">New Email</label>
+                      <input type="email" class="form-control" id="newEmail" name="new_email" required />
+                  </div>
+              </div>
+              <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                  <button type="submit" class="btn btn-primary">Update Email</button>
+              </div>
+          </form>
+      </div>
+  </div>
+</div>
+
+
+<div class="modal fade" id="updatePasswordModal" tabindex="-1" role="dialog" aria-labelledby="updatePasswordModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+      <div class="modal-content">
+          <div class="modal-header">
+              <h5 class="modal-title" id="updatePasswordModalLabel">Update Password</h5>
+              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+              </button>
+          </div>
+          <form method="POST" action="{{ url_for('admin_routes.update_Epassword', Utoken=user.Utoken) }}">
+              <div class="modal-body">
+                  <div class="form-group">
+                      <label for="newPassword">New Password</label>
+                      <input type="password" class="form-control" id="newPassword" name="new_password" required />
+                  </div>
+                  <div class="form-group">
+                      <label for="confirmPassword">Confirm Password</label>
+                      <input type="password" class="form-control" id="confirmPassword" name="confirm_new_password" required />
+                  </div>
+              </div>
+              <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                  <button type="submit" class="btn btn-primary">Update Password</button>
+              </div>
+          </form>
+      </div>
+  </div>
+</div>
+
+</div>
+</div>
+
+</div>
 <footer>
   {% include 'components/footer.html' %} 
 </footer>

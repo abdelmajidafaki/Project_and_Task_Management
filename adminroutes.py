@@ -72,7 +72,21 @@ def update_status(userid):
     return redirect(url_for('admin_routes.usersdashboard'))
 
 
+@admin_routes.route('/admin/personal-tasks/<string:token>')
+@admin_required
+@login_required
+def employepertask(token):
 
+    task = PersonalTask.query.filter_by(token=token).first() 
+    
+    if task is None:
+        flash('Task not found.', 'danger')
+        return redirect(url_for('index')) 
+
+
+    task_progressions = PersonalTaskProgression.query.filter_by(Ptask_id=task.PTDID).all()
+    
+    return render_template('admin/employeeperstask.html', task=task, task_progressions=task_progressions)
 @admin_routes.route("/usersdashboard/userdetails/<Utoken>", methods=['GET', 'POST'])
 @login_required
 @admin_required
@@ -124,12 +138,15 @@ def delete_user(userid):
     user = users.query.get(userid)
     if user:
         try:
+            Project.query.filter_by(created_by=userid).update({'created_by': None})
             Task_Progression.query.filter_by(employee_id=userid).update({'employee_id': None})
             TaskAssignment.query.filter_by(employee_id=userid).update({'employee_id': None})
+            Event.query.filter_by(creator_id=userid).update({'creator_id': None})
+            
+            # Delete records from dependent tables
             PersonalTaskProgression.query.filter_by(employee_id=userid).delete()
             PersonalTask.query.filter_by(employee_id=userid).delete()
             TeamsMember.query.filter_by(userid=userid).delete()
-            Event.query.filter_by(creator_id=userid).update({'creator_id': None})
             EventEmployee.query.filter_by(employee_id=userid).delete()
             db.session.delete(user)
             db.session.commit()
@@ -259,13 +276,6 @@ def remove_member_from_team(team_id, member_id):
     if team_member:
         try:
             db.session.delete(team_member)
-            projects = Project.query.join(ProjectTeam).filter(ProjectTeam.team_id == team_id).all()
-            for project in projects:
-                tasks = Task.query.filter_by(project_id=project.project_id).all()
-                for task in tasks:
-                    task_assignment = TaskAssignment.query.filter_by(task_id=task.task_id, employee_id=member_id).first()
-                    if task_assignment:
-                        db.session.delete(task_assignment)
             db.session.commit()
             flash('Member removed and tasks unassigned successfully.', 'success')
         except Exception as e:
@@ -746,6 +756,7 @@ def update_project_statut():
             if 'open' in request.form:
                 if status in ['Upcoming', 'Closed']:
                     project.start_date = datetime.today().date()
+                    Task.query.filter_by(project_id=project_id).update({'start_date': project.start_date})
                 project.statut = 'in progress'
                 status = 'Open'
             elif 'close' in request.form:
@@ -982,3 +993,33 @@ def change_password(Utoken):
         flash('Current password is incorrect', 'danger')
 
     return redirect(url_for('employee_routes.profile', Utoken=Utoken))
+
+@admin_routes.route('/update_email/<Utoken>', methods=['POST'])
+@login_required
+def update_Eemail(Utoken):
+    user = users.query.filter_by(Utoken=Utoken).first()
+    new_email = request.form.get('new_email')
+    
+    if new_email:
+        user.email = new_email
+        db.session.commit()
+        flash('Email updated successfully', 'success')
+
+    
+    return redirect(request.referrer)
+
+@admin_routes.route('/update_password/<Utoken>', methods=['POST'])
+@login_required
+def update_Epassword(Utoken):
+    user = users.query.filter_by(Utoken=Utoken).first()
+    new_password = request.form.get('new_password')
+    confirm_new_password = request.form.get('confirm_new_password')
+
+    if new_password == confirm_new_password:
+        user.Pasword = bcrypt.generate_password_hash(new_password)
+        db.session.commit()
+        flash('Password updated successfully', 'success')
+    else:
+        flash('New passwords do not match', 'danger')
+
+    return redirect(request.referrer)

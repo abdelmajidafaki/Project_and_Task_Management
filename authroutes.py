@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, flash, redirect, url_for
 from flask_login import login_user, logout_user, login_required, current_user
 from extensions import db, bcrypt
 from modals import users
+import re
 
 auth_routes = Blueprint('auth_routes', __name__)
 
@@ -11,23 +12,30 @@ def indexpage():
 
 @auth_routes.route("/register", methods=['GET', 'POST'])
 def registerpage():
+
     if request.method == 'POST':
         fullname = request.form['fullname']
         email = request.form['email']
         password = request.form['password']
         cpassword = request.form['cpassword']
+        password_pattern = re.compile(r'(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?.&])[A-Za-z\d@$!%*?&]{8,}')
+
         if fullname and email:
             if password == cpassword:
-                hashed_password = bcrypt.generate_password_hash(cpassword).decode('utf-8')
-                new_user = users(fulname=fullname, email=email, Pasword=hashed_password)
-                db.session.add(new_user)
-                db.session.commit()
-                flash("Registration successful!", 'success')
-                return redirect(url_for('auth_routes.loginpage'))
+                if password_pattern.match(password):
+                    hashed_password = bcrypt.generate_password_hash(cpassword).decode('utf-8')
+                    new_user = users(fulname=fullname, email=email, Pasword=hashed_password)
+                    db.session.add(new_user)
+                    db.session.commit()
+                    flash("Registration successful!", 'success')
+                    return redirect(url_for('auth_routes.loginpage'))
+                else:
+                    flash("Password must include at least one uppercase letter, one lowercase letter, one number, and one symbol.", 'danger')
             else:
                 flash("Passwords do not match. Please try again.", 'danger')
         else:
             flash("You must fill all inputs.", 'danger')
+    
     return render_template("registerpage.html")
 
 @auth_routes.route("/logout", methods=['GET'])

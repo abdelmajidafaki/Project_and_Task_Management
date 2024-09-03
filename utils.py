@@ -22,7 +22,7 @@ def sort_tasks(tasks):
         return datetime.combine(d, datetime.min.time()) if isinstance(d, date) else d or datetime.max
 
     def sort_key(task_info):
-        task, _, _, _, status, _ = task_info  # Adjust to 6 elements
+        task, _, _, _, status, _ = task_info
         start_date = to_datetime(task.start_date)
         close_date = to_datetime(task.close_date)
         if status == 'Open':
